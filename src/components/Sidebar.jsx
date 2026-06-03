@@ -113,13 +113,11 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          <p
-            className={`text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-2 transition-all duration-300 ${
-              showText ? "px-3" : "text-center"
-            }`}
-          >
-            {showText ? "Menu" : "•"}
-          </p>
+          {showText && (
+            <p className="text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-2 px-3">
+              Menu
+            </p>
+          )}
 
           {menuItems.map((item) => {
             const active = isActive(item.path);
@@ -157,13 +155,14 @@ export default function Sidebar() {
           {/* ── Admin section ── hanya untuk ok-quality-admin ── */}
           {isAdmin && (
             <>
-              <div className={`mt-4 mb-2 transition-all duration-300 ${showText ? "px-3" : "text-center"}`}>
-                <p className="text-white/35 text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1">
-                  {showText
-                    ? <><ShieldCheck className="w-3 h-3" /> Admin</>
-                    : "•"
-                  }
-                </p>
+              <div className={`mt-4 mb-2 ${showText ? "px-3" : "flex justify-center"}`}>
+                {showText ? (
+                  <p className="text-white/35 text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Admin
+                  </p>
+                ) : (
+                  <ShieldCheck className="w-3.5 h-3.5 text-white/35" />
+                )}
               </div>
               {adminMenuItems.map((item) => {
                 const active = isActive(item.path);
