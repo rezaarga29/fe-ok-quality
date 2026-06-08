@@ -21,10 +21,12 @@ export async function getSession() {
     useAuthStore.getState().setUser(data);
 
     return {
-      loggedIn:   true,
-      user:       data.user,
-      is_admin:   data.is_admin ?? false,
-      expires_at: data.expires_at,
+      loggedIn:       true,
+      user:           data.user,
+      is_admin:       data.is_admin       ?? false,
+      is_doctor:      data.is_doctor      ?? false,
+      can_kesimpulan: data.can_kesimpulan ?? false,
+      expires_at:     data.expires_at,
     };
   } catch {
     useAuthStore.getState().clearUser();

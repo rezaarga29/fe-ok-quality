@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck } from "lucide-react";
 import { getAll } from "../../services/ok_quality.service";
 import KesimpulanModal from "./KesimpulanModal";
+import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 
 // ── Badge status tahap ───────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ function ProgressBar({ tahap = 0 }) {
 
 export default function OkQualityList() {
   const navigate = useNavigate();
+  const { canKesimpulan } = useAuth();
   const [data, setData]                       = useState([]);
   const [kesimpulanModal, setKesimpulanModal] = useState(null);
   const [loading, setLoading]                 = useState(true);
@@ -208,7 +210,7 @@ export default function OkQualityList() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          {row.Status === "selesai" && (
+                          {row.Status === "selesai" && canKesimpulan && (
                             <button
                               onClick={() => setKesimpulanModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg })}
                               className="p-2 rounded-lg text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
@@ -259,7 +261,7 @@ export default function OkQualityList() {
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
-                      {row.Status === "selesai" && (
+                      {row.Status === "selesai" && canKesimpulan && (
                         <button
                           onClick={() => setKesimpulanModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg })}
                           className="p-1.5 rounded-lg text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"

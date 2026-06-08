@@ -93,7 +93,7 @@ function KesimpulanBadge({ penilaian }) {
 }
 
 // ── Patient card ──────────────────────────────────────────────────────────────
-function PatientCard({ row, onView, onEdit, onKesimpulan }) {
+function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
   const nama     = row.Nama_Pasien ?? "-";
   const initials = nama.split(" ").slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
   const tanggal  = row.Tanggal
@@ -133,7 +133,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan }) {
           <button onClick={() => onEdit(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f] transition-colors" title="Edit">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {row.Status === "selesai" && (
+          {row.Status === "selesai" && canKesimpulan && (
             <button
               onClick={() => onKesimpulan(row)}
               className="p-1.5 rounded-lg text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
@@ -193,7 +193,7 @@ const TAHAP_FILTER_OPTIONS = [
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, canKesimpulan, loading: authLoading } = useAuth();
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
@@ -510,6 +510,7 @@ export default function HomePage() {
                   onView={(id) => navigate(`/ok-quality/${id}`)}
                   onEdit={(id) => navigate(`/ok-quality/form/${id}`)}
                   onKesimpulan={(r) => setKesimpulanModal({ id: r.Id, nama: r.Nama_Pasien, noReg: r.No_Reg })}
+                  canKesimpulan={canKesimpulan}
                 />
               ))}
             </div>
