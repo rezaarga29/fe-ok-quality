@@ -310,7 +310,7 @@ export default function OkQualityDetail() {
   const hasGCSAfter = data.GCS_After_E || data.GCS_After_M || data.GCS_After_V;
   const hasGCS = hasGCSBefore || hasGCSAfter;
 
-  const hasTTV = data.TTV_TD || data.TTV_HR || data.TTV_Suhu;
+  const hasTTV = data.TTV_TD || data.TTV_HR || data.TTV_Suhu || data.TTV_RR;
   const hasVS = data.VS_TD || data.VS_Nadi || data.VS_Suhu;
   const hasVitals = hasTTV || hasVS;
 
@@ -476,9 +476,10 @@ export default function OkQualityDetail() {
                   tdper={data.TTV_TDPer}
                   hr={data.TTV_HR}
                   suhu={data.TTV_Suhu}
+                  rr={data.TTV_RR}
                   label="Tanda Vital Sebelum Operasi"
                   color="text-sky-500"
-                  showRR={false}
+                  showRR={true}
                 />
               </div>
 

@@ -272,6 +272,7 @@ export default function OkQualityForm() {
     TTV_TDPer: "",
     TTV_HR: "",
     TTV_Suhu: "",
+    TTV_RR: "",
     Cara_Masuk: "",
     Asal_Pasien: "",
     Penyakit_Penyerta: "",
@@ -381,6 +382,7 @@ export default function OkQualityForm() {
           TTV_TDPer: d.TTV_TDPer,
           TTV_HR: d.TTV_HR,
           TTV_Suhu: d.TTV_Suhu,
+          TTV_RR: d.TTV_RR,
           Cara_Masuk: d.Cara_Masuk,
           Asal_Pasien: d.Asal_Pasien,
         };
@@ -709,6 +711,14 @@ export default function OkQualityForm() {
                 onChange={(e) => set("TTV_Suhu", e.target.value)}
                 autoFilled={filledFields.has("TTV_Suhu")}
                 placeholder="36.5"
+              />
+            </Field>
+            <Field label="Respiratory Rate (x/menit)">
+              <Input
+                type="number"
+                value={form.TTV_RR}
+                onChange={(e) => set("TTV_RR", e.target.value)}
+                placeholder="20"
               />
             </Field>
           </Section>
