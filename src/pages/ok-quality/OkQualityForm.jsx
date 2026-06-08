@@ -10,10 +10,14 @@ import {
   CheckCircle2,
   RefreshCw,
   ArrowLeft,
+  Calendar,
+  X,
+  Stethoscope,
 } from "lucide-react";
 import {
   getById,
   getAutoFill,
+  getJadwal,
   create,
   updateTahap,
 } from "../../services/ok_quality.service";
@@ -231,6 +235,15 @@ export default function OkQualityForm() {
   const [autoFillSrc, setAutoFillSrc] = useState(null);
   const [noRegInput, setNoRegInput] = useState("");
   const [dokterOptions, setDokterOptions] = useState([]);
+
+  // ── Jadwal picker state ────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const [jadwalDate, setJadwalDate]   = useState(today);
+  const [jadwalQ,    setJadwalQ]      = useState("");
+  const [jadwalRows, setJadwalRows]   = useState([]);
+  const [jadwalLoading, setJadwalLoading] = useState(false);
+  const [jadwalSearched, setJadwalSearched] = useState(false);
+  const [selectedJadwal, setSelectedJadwal] = useState(null);
   const [dpjpSelected,  setDpjpSelected]  = useState([]);  // array of {value, label}
 
   // Load daftar dokter untuk react-select
@@ -418,6 +431,81 @@ export default function OkQualityForm() {
     }
   };
 
+  // ── Cari jadwal operasi ────────────────────────────────────────────────────
+  const handleJadwalSearch = async () => {
+    setJadwalLoading(true);
+    setJadwalSearched(true);
+    try {
+      const params = {};
+      if (jadwalDate) params.tanggal = jadwalDate;
+      if (jadwalQ.trim()) params.q = jadwalQ.trim();
+      const res = await getJadwal(params);
+      setJadwalRows(res.data || []);
+    } catch {
+      setJadwalRows([]);
+    } finally {
+      setJadwalLoading(false);
+    }
+  };
+
+  // Pilih jadwal → auto-fill form
+  const handleJadwalPilih = async (row) => {
+    setSelectedJadwal(row);
+    setJadwalRows([]);
+    setJadwalSearched(false);
+    const noReg = row.No_Reg;
+    setNoRegInput(noReg);
+    set("No_Reg", noReg);
+    // Panggil autoFill untuk ambil data lengkap dari tabel referensi
+    setAutoFilling(true);
+    try {
+      const res = await getAutoFill(noReg);
+      const d = res.data;
+      const filled = new Set();
+      setForm((f) => {
+        const next = { ...f, No_Reg: noReg };
+        const map = {
+          No_MR:        d.No_MR,
+          Nama_Pasien:  d._pasien?.Nama_Pasien,
+          Diagnosa:     d.Diagnosa,
+          Tindakan:     d.Tindakan,
+          GCS_Before_E: d.GCS_Before_E,
+          GCS_Before_M: d.GCS_Before_M,
+          GCS_Before_V: d.GCS_Before_V,
+          ASA:          d.ASA,
+          TTV_TD:       d.TTV_TD,
+          TTV_TDPer:    d.TTV_TDPer,
+          TTV_HR:       d.TTV_HR,
+          TTV_Suhu:     d.TTV_Suhu,
+          TTV_RR:       d.TTV_RR,
+          Cara_Masuk:   d.Cara_Masuk,
+          Asal_Pasien:  d.Asal_Pasien,
+        };
+        Object.entries(map).forEach(([k, v]) => {
+          if (v !== null && v !== undefined && v !== "") {
+            next[k] = v;
+            filled.add(k);
+          }
+        });
+        return next;
+      });
+      setFilledFields(filled);
+      setAutoFillSrc(d._sources);
+    } catch {
+      // Tetap lanjut walau autoFill gagal — No_Reg sudah terisi
+    } finally {
+      setAutoFilling(false);
+    }
+  };
+
+  // ── Auto-fill "RECOVERY ROOM" saat masuk Tahap 3 ──────────────────────────
+  useEffect(() => {
+    if (step === 3 && !form.Ruangan) {
+      set("Ruangan", "RECOVERY ROOM");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   // ── Save step ──────────────────────────────────────────────────────────────
   const handleSave = async (goNext = true) => {
     if (!form.No_Reg) {
@@ -526,7 +614,133 @@ export default function OkQualityForm() {
       ────────────────────────────────────────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          {/* No Reg + Auto-fill */}
+          {/* ── Cari dari Jadwal Operasi ──────────────────────────────── */}
+          {!isEdit && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-gray-700 mb-4 pb-3 border-b border-gray-100 flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-[#2d6a4f]" />
+                Cari dari Jadwal Operasi
+              </h3>
+
+              {/* Jika sudah ada yang dipilih */}
+              {selectedJadwal ? (
+                <div className="flex items-start justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-800 truncate">
+                      {selectedJadwal.Nama_Pasien || "—"}
+                    </p>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      No. Reg: <strong>{selectedJadwal.No_Reg}</strong>
+                      {" · "}No. MR: <strong>{selectedJadwal.No_MR}</strong>
+                      {" · "}{selectedJadwal.Tanggal}
+                    </p>
+                    {selectedJadwal.Tindakan && (
+                      <p className="text-xs text-emerald-600 mt-0.5 line-clamp-1">{selectedJadwal.Tindakan}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedJadwal(null);
+                      setJadwalRows([]);
+                      setJadwalSearched(false);
+                      // Reset field yang diisi dari jadwal
+                      setNoRegInput("");
+                      setFilledFields(new Set());
+                      setAutoFillSrc(null);
+                      setForm((f) => ({
+                        ...f,
+                        No_Reg: "", No_MR: "", Nama_Pasien: "",
+                        Diagnosa: "", Tindakan: "",
+                        GCS_Before_E: "", GCS_Before_M: "", GCS_Before_V: "",
+                        ASA: "",
+                        TTV_TD: "", TTV_TDPer: "", TTV_HR: "", TTV_Suhu: "", TTV_RR: "",
+                        Cara_Masuk: "", Asal_Pasien: "",
+                      }));
+                    }}
+                    className="shrink-0 text-emerald-600 hover:text-emerald-900 transition-colors"
+                    title="Ganti jadwal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Filter & search bar */}
+                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                    <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 bg-white">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        type="date"
+                        value={jadwalDate}
+                        onChange={(e) => setJadwalDate(e.target.value)}
+                        className="text-sm py-2 bg-transparent outline-none w-full"
+                      />
+                    </div>
+                    <div className="flex flex-1 gap-2">
+                      <input
+                        type="text"
+                        value={jadwalQ}
+                        onChange={(e) => setJadwalQ(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleJadwalSearch()}
+                        placeholder="No. MR / No. Reg / Nama Pasien"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f]"
+                      />
+                      <button
+                        onClick={handleJadwalSearch}
+                        disabled={jadwalLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2d6a4f] text-white text-xs font-semibold hover:bg-[#1b4332] disabled:opacity-60 transition-colors shrink-0"
+                      >
+                        {jadwalLoading
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Search className="w-4 h-4" />}
+                        <span className="hidden sm:inline">Cari</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Hasil pencarian */}
+                  {jadwalSearched && (
+                    jadwalLoading ? (
+                      <div className="flex justify-center py-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#2d6a4f]" />
+                      </div>
+                    ) : jadwalRows.length === 0 ? (
+                      <p className="text-center text-xs text-gray-400 py-4">
+                        Tidak ada jadwal ditemukan
+                      </p>
+                    ) : (
+                      <div className="border border-gray-100 rounded-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-gray-50">
+                        {jadwalRows.map((row) => (
+                          <button
+                            key={row.No_Jadwal}
+                            onClick={() => handleJadwalPilih(row)}
+                            className="w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-gray-800 group-hover:text-emerald-800 truncate">
+                                {row.Nama_Pasien || "—"}
+                              </span>
+                              <span className="text-xs text-gray-400 shrink-0">{row.Tanggal}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              No. Reg: <strong>{row.No_Reg}</strong>
+                              {" · "}No. MR: <strong>{row.No_MR}</strong>
+                              {row.Kamar ? ` · ${row.Kamar}` : ""}
+                            </div>
+                            {row.Tindakan && (
+                              <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{row.Tindakan}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* No Reg + Auto-fill (manual / edit mode) */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-700 mb-4 pb-3 border-b border-gray-100">
               Identifikasi Pasien
@@ -572,7 +786,7 @@ export default function OkQualityForm() {
                   placeholder="-"
                 />
               </Field>
-              <Field label="Cara Masuk" hint="ref: PENDAFTARAN">
+              <Field label="Cara Masuk">
                 <SelectInput
                   value={form.Cara_Masuk}
                   onChange={(e) => set("Cara_Masuk", e.target.value)}
@@ -581,7 +795,7 @@ export default function OkQualityForm() {
                   placeholder="— Pilih Cara Masuk —"
                 />
               </Field>
-              <Field label="Asal Pasien" hint="ref: PENDAFTARAN">
+              <Field label="Asal Pasien">
                 <SelectInput
                   value={form.Asal_Pasien}
                   onChange={(e) => set("Asal_Pasien", e.target.value)}
@@ -597,7 +811,6 @@ export default function OkQualityForm() {
             <div className="sm:col-span-2">
               <Field
                 label="Diagnosa"
-                hint="ref: ASESMEN_IGD / ASESMEN_TRANSFER_PASIEN"
               >
                 <Textarea
                   value={form.Diagnosa}
@@ -610,7 +823,6 @@ export default function OkQualityForm() {
             <div className="sm:col-span-2">
               <Field
                 label="Tindakan"
-                hint="ref: JADWAL_OPERASI / Informed Consent"
               >
                 <Textarea
                   value={form.Tindakan}
@@ -621,7 +833,7 @@ export default function OkQualityForm() {
               </Field>
             </div>
             <div className="sm:col-span-2">
-              <Field label="Penyakit Penyerta" hint="catatan medis DPJP">
+              <Field label="Penyakit Penyerta">
                 <Textarea
                   value={form.Penyakit_Penyerta}
                   onChange={(e) => set("Penyakit_Penyerta", e.target.value)}
@@ -632,7 +844,7 @@ export default function OkQualityForm() {
           </Section>
 
           <Section title="GCS Sebelum Operasi">
-            <Field label="E (Eye)" hint="ref: ASESMEN_IGD">
+            <Field label="E (Eye)">
               <Input
                 type="number"
                 value={form.GCS_Before_E}
@@ -641,7 +853,7 @@ export default function OkQualityForm() {
                 placeholder="1-4"
               />
             </Field>
-            <Field label="M (Motor)" hint="ref: ASESMEN_IGD">
+            <Field label="M (Motor)">
               <Input
                 type="number"
                 value={form.GCS_Before_M}
@@ -650,7 +862,7 @@ export default function OkQualityForm() {
                 placeholder="1-6"
               />
             </Field>
-            <Field label="V (Verbal)" hint="ref: ASESMEN_IGD">
+            <Field label="V (Verbal)">
               <Input
                 value={form.GCS_Before_V}
                 onChange={(e) => set("GCS_Before_V", e.target.value)}
@@ -658,7 +870,7 @@ export default function OkQualityForm() {
                 placeholder="1-5"
               />
             </Field>
-            <Field label="ASA Grade" hint="ref: ASESMEN_LAPORAN_ANESTESI">
+            <Field label="ASA Grade">
               <SelectInput
                 value={form.ASA}
                 onChange={(e) => set("ASA", e.target.value)}
@@ -672,7 +884,6 @@ export default function OkQualityForm() {
           <Section title="Tanda-Tanda Vital">
             <Field
               label="TD Sistolik (mmHg)"
-              hint="ref: ASESMEN_TRANSFER_PASIEN"
             >
               <Input
                 type="number"
@@ -684,7 +895,6 @@ export default function OkQualityForm() {
             </Field>
             <Field
               label="TD Diastolik (mmHg)"
-              hint="ref: ASESMEN_TRANSFER_PASIEN"
             >
               <Input
                 type="number"
@@ -694,7 +904,7 @@ export default function OkQualityForm() {
                 placeholder="80"
               />
             </Field>
-            <Field label="HR / Nadi (bpm)" hint="ref: ASESMEN_TRANSFER_PASIEN">
+            <Field label="HR / Nadi (bpm)">
               <Input
                 type="number"
                 value={form.TTV_HR}
@@ -703,7 +913,7 @@ export default function OkQualityForm() {
                 placeholder="80"
               />
             </Field>
-            <Field label="Suhu (°C)" hint="ref: ASESMEN_TRANSFER_PASIEN">
+            <Field label="Suhu (°C)">
               <Input
                 type="number"
                 step="0.1"
@@ -890,7 +1100,6 @@ export default function OkQualityForm() {
             <div className="sm:col-span-2">
               <Field
                 label="Kondisi Luka di Ruang Pemulihan"
-                hint="surgical safety checklist signout"
               >
                 <SelectInput
                   value={form.Kondisi_Luka_RR}
@@ -959,7 +1168,7 @@ export default function OkQualityForm() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Simpan & Lanjut
               <ChevronRight className="w-4 h-4" />
-            </button>
+                </button>
           ) : (
             <button
               onClick={() => handleSave(true)}
@@ -971,7 +1180,7 @@ export default function OkQualityForm() {
               ) : (
                 <CheckCircle2 className="w-4 h-4" />
               )}
-              Selesaikan
+              Selesai
             </button>
           )}
         </div>

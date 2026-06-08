@@ -507,8 +507,8 @@ export default function HomePage() {
                 <PatientCard
                   key={row.Id}
                   row={row}
-                  onView={(id) => navigate(`/ok-quality/${id}`)}
-                  onEdit={(id) => navigate(`/ok-quality/form/${id}`)}
+                  onView={(id) => navigate(`/ok-quality/${id}`, { state: { activeMenu: "/home" } })}
+                  onEdit={(id) => navigate(`/ok-quality/form/${id}`, { state: { activeMenu: "/home" } })}
                   onKesimpulan={(r) => setKesimpulanModal({ id: r.Id, nama: r.Nama_Pasien, noReg: r.No_Reg })}
                   canKesimpulan={canKesimpulan}
                 />

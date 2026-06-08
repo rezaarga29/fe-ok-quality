@@ -7,6 +7,8 @@ import {
   ClipboardCheck, ThumbsUp, Minus, ThumbsDown, UserCheck,
 } from "lucide-react";
 import { getById, getKesimpulan } from "../../services/ok_quality.service";
+import { useAuth } from "../../context/AuthContext";
+import KesimpulanModal from "./KesimpulanModal";
 import Swal from "sweetalert2";
 
 // ── Journey stepper ───────────────────────────────────────────────────────────
@@ -280,9 +282,11 @@ const fmtDateTime = (d) =>
 export default function OkQualityDetail() {
   const { id }    = useParams();
   const navigate  = useNavigate();
+  const { canKesimpulan } = useAuth();
   const [data,       setData]       = useState(null);
   const [kesimpulan, setKesimpulan] = useState(null);
   const [loading,    setLoading]    = useState(true);
+  const [showKesimpulanModal, setShowKesimpulanModal] = useState(false);
 
   useEffect(() => {
     Promise.all([getById(id), getKesimpulan(id)])
@@ -323,7 +327,7 @@ export default function OkQualityDetail() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-5">
-      {/* Back + Edit */}
+      {/* Back + Actions */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate("/ok-quality")}
@@ -332,13 +336,25 @@ export default function OkQualityDetail() {
           <ArrowLeft className="w-4 h-4" />
           Kembali
         </button>
-        <button
-          onClick={() => navigate(`/ok-quality/form/${id}`)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-          Edit
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Tombol Kesimpulan — hanya dokter/admin, hanya saat selesai */}
+          {canKesimpulan && data.Status === "selesai" && (
+            <button
+              onClick={() => setShowKesimpulanModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              {kesimpulan ? "Edit Kesimpulan" : "Beri Kesimpulan"}
+            </button>
+          )}
+          <button
+            onClick={() => navigate(`/ok-quality/form/${id}`)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </button>
+        </div>
       </div>
 
       {/* Hero card */}
@@ -656,8 +672,17 @@ export default function OkQualityDetail() {
         </div>
       </div>
 
-      {/* Bottom edit */}
-      <div className="flex justify-end pt-2 pb-6">
+      {/* Bottom actions */}
+      <div className="flex items-center justify-end gap-2 pt-2 pb-6">
+        {canKesimpulan && data.Status === "selesai" && (
+          <button
+            onClick={() => setShowKesimpulanModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            {kesimpulan ? "Edit Kesimpulan" : "Beri Kesimpulan"}
+          </button>
+        )}
         <button
           onClick={() => navigate(`/ok-quality/form/${id}`)}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
@@ -666,6 +691,20 @@ export default function OkQualityDetail() {
           Edit Penilaian
         </button>
       </div>
+
+      {/* Modal Kesimpulan */}
+      {showKesimpulanModal && (
+        <KesimpulanModal
+          penilaianId={parseInt(id)}
+          namaPassien={data.Nama_Pasien}
+          noReg={data.No_Reg}
+          onClose={() => setShowKesimpulanModal(false)}
+          onSaved={() => {
+            setShowKesimpulanModal(false);
+            navigate("/home");
+          }}
+        />
+      )}
     </div>
   );
 }

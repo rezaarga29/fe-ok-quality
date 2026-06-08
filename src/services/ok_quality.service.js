@@ -21,6 +21,12 @@ export async function getById(id) {
   return res.data;
 }
 
+// ── JADWAL OPERASI ──────────────────────────────────────────────────────────
+export async function getJadwal(params = {}) {
+  const res = await axios.get(`${BASE}/jadwal`, { ...cfg, params });
+  return res.data;
+}
+
 // ── AUTO-FILL dari tabel referensi ──────────────────────────────────────────
 export async function getAutoFill(no_reg) {
   const res = await axios.get(`${BASE}/autofill/${no_reg}`, cfg);

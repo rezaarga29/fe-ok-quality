@@ -62,10 +62,16 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  const isActive = (path) =>
-    path === "/home"
+  const isActive = (path) => {
+    // Jika ada activeMenu dari navigation state (misal dari Beranda ke detail),
+    // gunakan itu sebagai override
+    if (location.state?.activeMenu) {
+      return path === location.state.activeMenu;
+    }
+    return path === "/home"
       ? location.pathname === path
       : location.pathname.startsWith(path);
+  };
 
   const handleLogout = () => {
     Swal.fire({
