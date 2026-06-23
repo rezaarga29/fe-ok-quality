@@ -4,8 +4,8 @@ const BASE = "/ok-quality";
 const cfg  = {};
 
 // ── STATS ───────────────────────────────────────────────────────────────────
-export async function getStats() {
-  const res = await axios.get(`${BASE}/stats`, cfg);
+export async function getStats(params = {}) {
+  const res = await axios.get(`${BASE}/stats`, { ...cfg, params });
   return res.data;
 }
 

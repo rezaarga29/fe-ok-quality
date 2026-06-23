@@ -8,9 +8,10 @@ import { AuthProvider } from "./context/AuthContext";
 import UserLayout from "./components/UserLayout";
 import LoginPage from "./pages/Login";
 import HomePage from "./pages/admin/HomePage";
-import OkQualityList   from "./pages/ok-quality/OkQualityList";
-import OkQualityForm   from "./pages/ok-quality/OkQualityForm";
-import OkQualityDetail from "./pages/ok-quality/OkQualityDetail";
+import OkQualityList      from "./pages/ok-quality/OkQualityList";
+import OkQualityForm      from "./pages/ok-quality/OkQualityForm";
+import OkQualityDetail    from "./pages/ok-quality/OkQualityDetail";
+import JadwalOperasiPage  from "./pages/ok-quality/JadwalOperasiPage";
 import AdminLogs from "./pages/admin/AdminLogs";
 import NotFound404 from "./pages/404NotFound";
 import ForbiddenPage from "./pages/Forbidden";
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
       { path: "/ok-quality/form",         element: <OkQualityForm /> },
       { path: "/ok-quality/form/:id",     element: <OkQualityForm /> },
       { path: "/ok-quality/:id",          element: <OkQualityDetail /> },
+      { path: "/jadwal-operasi",          element: <JadwalOperasiPage /> },
 
       // ── Admin ────────────────────────────────────────────────
       { path: "/admin/logs",              element: <AdminLogs /> },

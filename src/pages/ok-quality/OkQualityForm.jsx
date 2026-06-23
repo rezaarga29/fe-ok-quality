@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Select from "react-select";
 import {
   ChevronRight,
@@ -13,6 +13,8 @@ import {
   Calendar,
   X,
   Stethoscope,
+  MapPin,
+  ImageOff,
 } from "lucide-react";
 import {
   getById,
@@ -21,6 +23,7 @@ import {
   create,
   updateTahap,
 } from "../../services/ok_quality.service";
+import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { getDokterList } from "../../services/dokter.service";
 import Swal from "sweetalert2";
 
@@ -60,12 +63,7 @@ const PENDARAHAN_OPTIONS = [
   "Banyak (> 500 cc)",
 ];
 
-const PERLENGKETAN_OPTIONS = [
-  "Tidak Ada",
-  "Ringan",
-  "Sedang",
-  "Berat",
-];
+const PERLENGKETAN_OPTIONS = ["Tidak Ada", "Ringan", "Sedang", "Berat"];
 
 const KONDISI_LUKA_OPTIONS = [
   "Baik / Kering",
@@ -224,7 +222,11 @@ function AutoFillInfo({ sources }) {
 export default function OkQualityForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEdit = !!id;
+
+  // Data jadwal yang di-pass dari halaman Jadwal Operasi
+  const jadwalFromState = location.state?.jadwal || null;
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -238,13 +240,18 @@ export default function OkQualityForm() {
 
   // ── Jadwal picker state ────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const [jadwalDate, setJadwalDate]   = useState(today);
-  const [jadwalQ,    setJadwalQ]      = useState("");
-  const [jadwalRows, setJadwalRows]   = useState([]);
+  const [jadwalDate, setJadwalDate] = useState(today);
+  const [jadwalQ, setJadwalQ] = useState("");
+  const [jadwalRows, setJadwalRows] = useState([]);
   const [jadwalLoading, setJadwalLoading] = useState(false);
   const [jadwalSearched, setJadwalSearched] = useState(false);
-  const [selectedJadwal, setSelectedJadwal] = useState(null);
-  const [dpjpSelected,  setDpjpSelected]  = useState([]);  // array of {value, label}
+  // Jika dari JadwalOperasiPage, gunakan data yang sudah ada di state
+  const [selectedJadwal, setSelectedJadwal] = useState(jadwalFromState);
+  const [dpjpSelected, setDpjpSelected] = useState([]); // array of {value, label}
+
+  // ── Penandaan Lokasi Operasi (read-only dari tabel referensi) ────────────────
+  const [penandaan, setPenandaan]       = useState(null); // { Prosedur, Photo (base64), Tgl_Pasien, Tgl_Dokter }
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
 
   // Load daftar dokter untuk react-select
   useEffect(() => {
@@ -266,7 +273,7 @@ export default function OkQualityForm() {
         });
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Form state ─────────────────────────────────────────────────────────────
@@ -342,12 +349,10 @@ export default function OkQualityForm() {
           setDpjpSelected((prev) =>
             prev.length > 0
               ? prev
-              : dokterOptions.filter((o) => labels.includes(o.label))
+              : dokterOptions.filter((o) => labels.includes(o.label)),
           );
           // Simpan juga sebagai fallback label kalau dokterOptions belum load
-          setDpjpSelected(
-            labels.map((label) => ({ value: label, label }))
-          );
+          setDpjpSelected(labels.map((label) => ({ value: label, label })));
         }
         // Mulai dari tahap berikutnya yang belum selesai
         const nextStep = Math.min((d.Tahap_Selesai || 0) + 1, 3);
@@ -363,6 +368,85 @@ export default function OkQualityForm() {
       )
       .finally(() => setLoading(false));
   }, [id, isEdit]);
+
+  // ── Jika dari Jadwal Operasi, langsung auto-fill saat mount ──────────────────
+  useEffect(() => {
+    if (!jadwalFromState || isEdit) return;
+    const noReg = jadwalFromState.No_Reg;
+    if (!noReg) return;
+
+    setNoRegInput(noReg);
+
+    // Pre-fill field yang ada di jadwal (tanpa tunggu autoFill)
+    setForm((f) => {
+      const next = { ...f, No_Reg: noReg };
+      if (jadwalFromState.No_MR) next.No_MR = jadwalFromState.No_MR;
+      if (jadwalFromState.Nama_Pasien)
+        next.Nama_Pasien = jadwalFromState.Nama_Pasien;
+      if (jadwalFromState.Diagnosa) next.Diagnosa = jadwalFromState.Diagnosa;
+      if (jadwalFromState.Tindakan) next.Tindakan = jadwalFromState.Tindakan;
+      return next;
+    });
+
+    const filled = new Set(["No_Reg"]);
+    if (jadwalFromState.No_MR) filled.add("No_MR");
+    if (jadwalFromState.Nama_Pasien) filled.add("Nama_Pasien");
+    if (jadwalFromState.Diagnosa) filled.add("Diagnosa");
+    if (jadwalFromState.Tindakan) filled.add("Tindakan");
+    setFilledFields(filled);
+    setAutoFillSrc({ "Jadwal Operasi": true });
+
+    // Lanjut coba auto-fill tambahan dari tabel referensi
+    setAutoFilling(true);
+    getAutoFill(noReg)
+      .then((res) => {
+        const d = res.data;
+        const newFilled = new Set(filled);
+        setForm((f) => {
+          const next = { ...f };
+          const map = {
+            GCS_Before_E: d.GCS_Before_E,
+            GCS_Before_M: d.GCS_Before_M,
+            GCS_Before_V: d.GCS_Before_V,
+            ASA: d.ASA,
+            TTV_TD: d.TTV_TD,
+            TTV_TDPer: d.TTV_TDPer,
+            TTV_HR: d.TTV_HR,
+            TTV_Suhu: d.TTV_Suhu,
+            TTV_RR: d.TTV_RR,
+            Cara_Masuk: d.Cara_Masuk,
+            Asal_Pasien: d.Asal_Pasien,
+            // Ambil data medis dari referensi jika belum ada di jadwal
+            ...(!jadwalFromState.Diagnosa && d.Diagnosa
+              ? { Diagnosa: d.Diagnosa }
+              : {}),
+            ...(!jadwalFromState.Tindakan && d.Tindakan
+              ? { Tindakan: d.Tindakan }
+              : {}),
+            ...(!jadwalFromState.No_MR && d.No_MR ? { No_MR: d.No_MR } : {}),
+            ...(d._pasien?.Nama_Pasien
+              ? { Nama_Pasien: d._pasien.Nama_Pasien }
+              : {}),
+          };
+          Object.entries(map).forEach(([k, v]) => {
+            if (v !== null && v !== undefined && v !== "") {
+              next[k] = v;
+              newFilled.add(k);
+            }
+          });
+          return next;
+        });
+        setFilledFields(newFilled);
+        setAutoFillSrc(
+          d._sources
+            ? { ...d._sources, "Jadwal Operasi": true }
+            : { "Jadwal Operasi": true },
+        );
+      })
+      .catch(() => {})
+      .finally(() => setAutoFilling(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Auto-fill dari tabel referensi ─────────────────────────────────────────
   const handleAutoFill = async () => {
@@ -410,6 +494,7 @@ export default function OkQualityForm() {
 
       setFilledFields(filled);
       setAutoFillSrc(d._sources);
+      loadPenandaan(noRegInput.trim());
 
       Swal.fire({
         icon: "success",
@@ -465,21 +550,21 @@ export default function OkQualityForm() {
       setForm((f) => {
         const next = { ...f, No_Reg: noReg };
         const map = {
-          No_MR:        d.No_MR,
-          Nama_Pasien:  d._pasien?.Nama_Pasien,
-          Diagnosa:     d.Diagnosa,
-          Tindakan:     d.Tindakan,
+          No_MR: d.No_MR,
+          Nama_Pasien: d._pasien?.Nama_Pasien,
+          Diagnosa: d.Diagnosa,
+          Tindakan: d.Tindakan,
           GCS_Before_E: d.GCS_Before_E,
           GCS_Before_M: d.GCS_Before_M,
           GCS_Before_V: d.GCS_Before_V,
-          ASA:          d.ASA,
-          TTV_TD:       d.TTV_TD,
-          TTV_TDPer:    d.TTV_TDPer,
-          TTV_HR:       d.TTV_HR,
-          TTV_Suhu:     d.TTV_Suhu,
-          TTV_RR:       d.TTV_RR,
-          Cara_Masuk:   d.Cara_Masuk,
-          Asal_Pasien:  d.Asal_Pasien,
+          ASA: d.ASA,
+          TTV_TD: d.TTV_TD,
+          TTV_TDPer: d.TTV_TDPer,
+          TTV_HR: d.TTV_HR,
+          TTV_Suhu: d.TTV_Suhu,
+          TTV_RR: d.TTV_RR,
+          Cara_Masuk: d.Cara_Masuk,
+          Asal_Pasien: d.Asal_Pasien,
         };
         Object.entries(map).forEach(([k, v]) => {
           if (v !== null && v !== undefined && v !== "") {
@@ -491,6 +576,7 @@ export default function OkQualityForm() {
       });
       setFilledFields(filled);
       setAutoFillSrc(d._sources);
+      loadPenandaan(noReg);
     } catch {
       // Tetap lanjut walau autoFill gagal — No_Reg sudah terisi
     } finally {
@@ -498,12 +584,39 @@ export default function OkQualityForm() {
     }
   };
 
+  // ── Load penandaan lokasi by No_Reg (read-only) ───────────────────────────
+  const loadPenandaan = async (noReg) => {
+    if (!noReg) return;
+    try {
+      const res = await getPenandaan(noReg);
+      if (res.success && res.data) {
+        setPenandaan(res.data);
+      } else {
+        setPenandaan(null);
+      }
+    } catch {
+      setPenandaan(null);
+    }
+  };
+
+  // Muat saat edit
+  useEffect(() => {
+    if (isEdit && form.No_Reg) loadPenandaan(form.No_Reg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, form.No_Reg]);
+
+  // Muat saat dari JadwalOperasiPage
+  useEffect(() => {
+    if (jadwalFromState?.No_Reg) loadPenandaan(jadwalFromState.No_Reg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Auto-fill "RECOVERY ROOM" saat masuk Tahap 3 ──────────────────────────
   useEffect(() => {
     if (step === 3 && !form.Ruangan) {
       set("Ruangan", "RECOVERY ROOM");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   // ── Save step ──────────────────────────────────────────────────────────────
@@ -546,7 +659,7 @@ export default function OkQualityForm() {
           timer: 2500,
           showConfirmButton: false,
         });
-        navigate("/ok-quality");
+        navigate("/home");
         return;
       }
 
@@ -589,7 +702,7 @@ export default function OkQualityForm() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       {/* Back */}
       <button
-        onClick={() => navigate("/ok-quality")}
+        onClick={() => navigate(-1)}
         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-5 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -625,43 +738,70 @@ export default function OkQualityForm() {
               {/* Jika sudah ada yang dipilih */}
               {selectedJadwal ? (
                 <div className="flex items-start justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-emerald-800 truncate">
                       {selectedJadwal.Nama_Pasien || "—"}
                     </p>
                     <p className="text-xs text-emerald-700 mt-0.5">
                       No. Reg: <strong>{selectedJadwal.No_Reg}</strong>
                       {" · "}No. MR: <strong>{selectedJadwal.No_MR}</strong>
-                      {" · "}{selectedJadwal.Tanggal}
+                      {selectedJadwal.Tanggal
+                        ? ` · ${selectedJadwal.Tanggal}`
+                        : ""}
+                      {selectedJadwal.Kamar ? ` · ${selectedJadwal.Kamar}` : ""}
                     </p>
+                    {(selectedJadwal.DPJP_Nama || selectedJadwal.DPJP) && (
+                      <p className="text-xs text-emerald-700 mt-0.5 flex items-center gap-1">
+                        <Stethoscope className="w-3 h-3 shrink-0" />
+                        DPJP:{" "}
+                        <strong>
+                          {selectedJadwal.DPJP_Nama || selectedJadwal.DPJP}
+                        </strong>
+                      </p>
+                    )}
                     {selectedJadwal.Tindakan && (
-                      <p className="text-xs text-emerald-600 mt-0.5 line-clamp-1">{selectedJadwal.Tindakan}</p>
+                      <p className="text-xs text-emerald-600 mt-0.5 line-clamp-1">
+                        {selectedJadwal.Tindakan}
+                      </p>
                     )}
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedJadwal(null);
-                      setJadwalRows([]);
-                      setJadwalSearched(false);
-                      // Reset field yang diisi dari jadwal
-                      setNoRegInput("");
-                      setFilledFields(new Set());
-                      setAutoFillSrc(null);
-                      setForm((f) => ({
-                        ...f,
-                        No_Reg: "", No_MR: "", Nama_Pasien: "",
-                        Diagnosa: "", Tindakan: "",
-                        GCS_Before_E: "", GCS_Before_M: "", GCS_Before_V: "",
-                        ASA: "",
-                        TTV_TD: "", TTV_TDPer: "", TTV_HR: "", TTV_Suhu: "", TTV_RR: "",
-                        Cara_Masuk: "", Asal_Pasien: "",
-                      }));
-                    }}
-                    className="shrink-0 text-emerald-600 hover:text-emerald-900 transition-colors"
-                    title="Ganti jadwal"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  {/* Jika dari state (JadwalOperasiPage), tidak tampilkan X — sudah commit */}
+                  {!jadwalFromState && (
+                    <button
+                      onClick={() => {
+                        setSelectedJadwal(null);
+                        setJadwalRows([]);
+                        setJadwalSearched(false);
+                        // Reset field yang diisi dari jadwal
+                        setNoRegInput("");
+                        setFilledFields(new Set());
+                        setAutoFillSrc(null);
+                        setForm((f) => ({
+                          ...f,
+                          No_Reg: "",
+                          No_MR: "",
+                          Nama_Pasien: "",
+                          Diagnosa: "",
+                          Tindakan: "",
+                          GCS_Before_E: "",
+                          GCS_Before_M: "",
+                          GCS_Before_V: "",
+                          ASA: "",
+                          TTV_TD: "",
+                          TTV_TDPer: "",
+                          TTV_HR: "",
+                          TTV_Suhu: "",
+                          TTV_RR: "",
+                          Cara_Masuk: "",
+                          Asal_Pasien: "",
+                        }));
+                      }}
+                      className="shrink-0 text-emerald-600 hover:text-emerald-900 transition-colors"
+                      title="Ganti jadwal"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <>
@@ -681,7 +821,9 @@ export default function OkQualityForm() {
                         type="text"
                         value={jadwalQ}
                         onChange={(e) => setJadwalQ(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleJadwalSearch()}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleJadwalSearch()
+                        }
                         placeholder="No. MR / No. Reg / Nama Pasien"
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f]"
                       />
@@ -690,17 +832,19 @@ export default function OkQualityForm() {
                         disabled={jadwalLoading}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2d6a4f] text-white text-xs font-semibold hover:bg-[#1b4332] disabled:opacity-60 transition-colors shrink-0"
                       >
-                        {jadwalLoading
-                          ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Search className="w-4 h-4" />}
+                        {jadwalLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Search className="w-4 h-4" />
+                        )}
                         <span className="hidden sm:inline">Cari</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Hasil pencarian */}
-                  {jadwalSearched && (
-                    jadwalLoading ? (
+                  {jadwalSearched &&
+                    (jadwalLoading ? (
                       <div className="flex justify-center py-6">
                         <Loader2 className="w-5 h-5 animate-spin text-[#2d6a4f]" />
                       </div>
@@ -720,7 +864,9 @@ export default function OkQualityForm() {
                               <span className="text-sm font-semibold text-gray-800 group-hover:text-emerald-800 truncate">
                                 {row.Nama_Pasien || "—"}
                               </span>
-                              <span className="text-xs text-gray-400 shrink-0">{row.Tanggal}</span>
+                              <span className="text-xs text-gray-400 shrink-0">
+                                {row.Tanggal}
+                              </span>
                             </div>
                             <div className="text-xs text-gray-500 mt-0.5">
                               No. Reg: <strong>{row.No_Reg}</strong>
@@ -728,13 +874,14 @@ export default function OkQualityForm() {
                               {row.Kamar ? ` · ${row.Kamar}` : ""}
                             </div>
                             {row.Tindakan && (
-                              <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{row.Tindakan}</div>
+                              <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                                {row.Tindakan}
+                              </div>
                             )}
                           </button>
                         ))}
                       </div>
-                    )
-                  )}
+                    ))}
                 </>
               )}
             </div>
@@ -809,9 +956,7 @@ export default function OkQualityForm() {
 
           <Section title="Diagnosa & Tindakan">
             <div className="sm:col-span-2">
-              <Field
-                label="Diagnosa"
-              >
+              <Field label="Diagnosa">
                 <Textarea
                   value={form.Diagnosa}
                   onChange={(e) => set("Diagnosa", e.target.value)}
@@ -821,9 +966,7 @@ export default function OkQualityForm() {
               </Field>
             </div>
             <div className="sm:col-span-2">
-              <Field
-                label="Tindakan"
-              >
+              <Field label="Tindakan">
                 <Textarea
                   value={form.Tindakan}
                   onChange={(e) => set("Tindakan", e.target.value)}
@@ -882,9 +1025,7 @@ export default function OkQualityForm() {
           </Section>
 
           <Section title="Tanda-Tanda Vital">
-            <Field
-              label="TD Sistolik (mmHg)"
-            >
+            <Field label="TD Sistolik (mmHg)">
               <Input
                 type="number"
                 value={form.TTV_TD}
@@ -893,9 +1034,7 @@ export default function OkQualityForm() {
                 placeholder="120"
               />
             </Field>
-            <Field
-              label="TD Diastolik (mmHg)"
-            >
+            <Field label="TD Diastolik (mmHg)">
               <Input
                 type="number"
                 value={form.TTV_TDPer}
@@ -940,6 +1079,116 @@ export default function OkQualityForm() {
       ────────────────────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
+          {/* Info jadwal / DPJP */}
+          {selectedJadwal &&
+            (selectedJadwal.DPJP_Nama || selectedJadwal.DPJP) && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 text-xs text-emerald-800">
+                <Stethoscope className="w-3.5 h-3.5 shrink-0 text-[#2d6a4f]" />
+                <span>
+                  DPJP:{" "}
+                  <strong>
+                    {selectedJadwal.DPJP_Nama || selectedJadwal.DPJP}
+                  </strong>
+                </span>
+                {selectedJadwal.Kamar && (
+                  <span className="text-emerald-600 ml-2">
+                    · Kamar: <strong>{selectedJadwal.Kamar}</strong>
+                  </span>
+                )}
+              </div>
+            )}
+          {/* ── Penandaan Lokasi Operasi (read-only referensi) ────────── */}
+          {penandaan !== null && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+              <h3 className="text-sm font-bold text-gray-700 mb-4 pb-3 border-b border-gray-100 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#2d6a4f]" />
+                Penandaan Lokasi Operasi
+              </h3>
+
+              {penandaan.Prosedur && (
+                <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+                  {penandaan.Prosedur}
+                </p>
+              )}
+
+              {penandaan.Photo ? (
+                <>
+                  <div
+                    onClick={() => setPhotoModalOpen(true)}
+                    className="rounded-xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center cursor-zoom-in relative group"
+                  >
+                    <img
+                      src={`data:image/jpeg;base64,${penandaan.Photo}`}
+                      alt="Foto penandaan lokasi operasi"
+                      className="max-h-56 max-w-full object-contain"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs rounded-full px-3 py-1.5 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5" />
+                        Perbesar
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Modal foto */}
+                  {photoModalOpen && (
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                      onClick={() => setPhotoModalOpen(false)}
+                    >
+                      <div
+                        className="relative max-w-3xl w-full"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => setPhotoModalOpen(false)}
+                          className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                          <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-[#2d6a4f]" />
+                            <span className="text-sm font-semibold text-gray-700">Foto Penandaan Lokasi Operasi</span>
+                          </div>
+                          <div className="p-4 flex items-center justify-center bg-gray-50">
+                            <img
+                              src={`data:image/jpeg;base64,${penandaan.Photo}`}
+                              alt="Foto penandaan lokasi operasi"
+                              className="max-h-[70vh] max-w-full object-contain rounded-lg"
+                            />
+                          </div>
+                          {penandaan.Prosedur && (
+                            <div className="px-4 pb-4 pt-2 border-t border-gray-100">
+                              <p className="text-xs text-gray-500 font-medium mb-1">Prosedur</p>
+                              <p className="text-sm text-gray-700">{penandaan.Prosedur}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-gray-400">
+                  <ImageOff className="w-5 h-5 shrink-0" />
+                  <span className="text-xs">Foto penandaan belum tersedia</span>
+                </div>
+              )}
+
+              {(penandaan.Tgl_Pasien || penandaan.Tgl_Dokter) && (
+                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+                  {penandaan.Tgl_Pasien && (
+                    <span>Tgl. Pasien: <strong>{penandaan.Tgl_Pasien?.slice(0, 10)}</strong></span>
+                  )}
+                  {penandaan.Tgl_Dokter && (
+                    <span>Tgl. Dokter: <strong>{penandaan.Tgl_Dokter?.slice(0, 10)}</strong></span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <Section title="Kondisi Selama Operasi">
             <div className="sm:col-span-2">
               <Field label="Pendarahan">
@@ -962,7 +1211,10 @@ export default function OkQualityForm() {
               </Field>
             </div>
             <div className="sm:col-span-2">
-              <Field label="Join DPJP Intra Operasi" hint="bisa pilih lebih dari 1">
+              <Field
+                label="Join DPJP Intra Operasi"
+                hint="bisa pilih lebih dari 1"
+              >
                 <Select
                   isMulti
                   options={dokterOptions}
@@ -970,7 +1222,10 @@ export default function OkQualityForm() {
                   onChange={(selected) => {
                     const arr = selected || [];
                     setDpjpSelected(arr);
-                    set("Join_DPJP_Intra_Op", arr.map((s) => s.label).join(" | "));
+                    set(
+                      "Join_DPJP_Intra_Op",
+                      arr.map((s) => s.label).join(" | "),
+                    );
                   }}
                   placeholder="Cari dan pilih DPJP..."
                   noOptionsMessage={() => "Dokter tidak ditemukan"}
@@ -983,7 +1238,9 @@ export default function OkQualityForm() {
                       ...base,
                       borderRadius: "0.75rem",
                       borderColor: state.isFocused ? "#2d6a4f" : "#e5e7eb",
-                      boxShadow: state.isFocused ? "0 0 0 2px rgba(45,106,79,0.2)" : "none",
+                      boxShadow: state.isFocused
+                        ? "0 0 0 2px rgba(45,106,79,0.2)"
+                        : "none",
                       fontSize: "0.875rem",
                       minHeight: "2.5rem",
                       "&:hover": { borderColor: "#2d6a4f" },
@@ -991,7 +1248,11 @@ export default function OkQualityForm() {
                     option: (base, state) => ({
                       ...base,
                       fontSize: "0.875rem",
-                      backgroundColor: state.isSelected ? "#2d6a4f" : state.isFocused ? "#d1fae5" : "white",
+                      backgroundColor: state.isSelected
+                        ? "#2d6a4f"
+                        : state.isFocused
+                          ? "#d1fae5"
+                          : "white",
                       color: state.isSelected ? "white" : "#1f2937",
                     }),
                     multiValue: (base) => ({
@@ -1009,10 +1270,21 @@ export default function OkQualityForm() {
                       ...base,
                       color: "#065f46",
                       borderRadius: "0 0.5rem 0.5rem 0",
-                      "&:hover": { backgroundColor: "#6ee7b7", color: "#064e3b" },
+                      "&:hover": {
+                        backgroundColor: "#6ee7b7",
+                        color: "#064e3b",
+                      },
                     }),
-                    placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
-                    menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                    placeholder: (base) => ({
+                      ...base,
+                      color: "#9ca3af",
+                      fontSize: "0.875rem",
+                    }),
+                    menu: (base) => ({
+                      ...base,
+                      borderRadius: "0.75rem",
+                      overflow: "hidden",
+                    }),
                   }}
                 />
               </Field>
@@ -1026,6 +1298,24 @@ export default function OkQualityForm() {
       ────────────────────────────────────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
+          {/* Info jadwal / DPJP */}
+          {selectedJadwal &&
+            (selectedJadwal.DPJP_Nama || selectedJadwal.DPJP) && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 text-xs text-emerald-800">
+                <Stethoscope className="w-3.5 h-3.5 shrink-0 text-[#2d6a4f]" />
+                <span>
+                  DPJP:{" "}
+                  <strong>
+                    {selectedJadwal.DPJP_Nama || selectedJadwal.DPJP}
+                  </strong>
+                </span>
+                {selectedJadwal.Kamar && (
+                  <span className="text-emerald-600 ml-2">
+                    · Kamar: <strong>{selectedJadwal.Kamar}</strong>
+                  </span>
+                )}
+              </div>
+            )}
           <Section title="GCS Sesudah Operasi">
             <Field label="E (Eye)">
               <Input
@@ -1098,9 +1388,7 @@ export default function OkQualityForm() {
 
           <Section title="Kondisi Luka & Ruangan">
             <div className="sm:col-span-2">
-              <Field
-                label="Kondisi Luka di Ruang Pemulihan"
-              >
+              <Field label="Kondisi Luka di Ruang Pemulihan">
                 <SelectInput
                   value={form.Kondisi_Luka_RR}
                   onChange={(e) => set("Kondisi_Luka_RR", e.target.value)}
@@ -1168,7 +1456,7 @@ export default function OkQualityForm() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Simpan & Lanjut
               <ChevronRight className="w-4 h-4" />
-                </button>
+            </button>
           ) : (
             <button
               onClick={() => handleSave(true)}
