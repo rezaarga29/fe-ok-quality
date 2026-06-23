@@ -4,9 +4,11 @@ import {
   ArrowLeft, Pencil, Loader2, CheckCircle2, Clock,
   AlertCircle, User, Calendar, Stethoscope, Activity,
   Syringe, HeartPulse, BedDouble, ArrowRight,
-  ClipboardCheck, ThumbsUp, Minus, ThumbsDown, UserCheck,
+  ClipboardCheck, ThumbsUp, ThumbsDown, UserCheck,
+  Timer, MapPin, ImageOff, X, Search,
 } from "lucide-react";
 import { getById, getKesimpulan } from "../../services/ok_quality.service";
+import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { useAuth } from "../../context/AuthContext";
 import KesimpulanModal from "./KesimpulanModal";
 import Swal from "sweetalert2";
@@ -205,15 +207,24 @@ function VitalsPanel({ td, tdper, hr, suhu, rr, label, color, showRR }) {
   );
 }
 
+// ── Hitung durasi manual dari HH:MM – HH:MM ──────────────────────────────────
+function calcDurasi(jamMulai, jamSelesai) {
+  if (!jamMulai || !jamSelesai) return null;
+  const [h1, m1] = jamMulai.split(":").map(Number);
+  const [h2, m2] = jamSelesai.split(":").map(Number);
+  let menit = h2 * 60 + m2 - (h1 * 60 + m1);
+  if (menit < 0) menit += 24 * 60;
+  return menit;
+}
+
 // ── Kesimpulan card ───────────────────────────────────────────────────────────
 const PENILAIAN_CFG = {
-  Baik:   { bg: "bg-emerald-50",  border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700", icon: ThumbsUp,   iconColor: "text-emerald-500" },
-  Cukup:  { bg: "bg-amber-50",    border: "border-amber-200",   badge: "bg-amber-100 text-amber-700",     icon: Minus,      iconColor: "text-amber-500"   },
-  Kurang: { bg: "bg-red-50",      border: "border-red-200",     badge: "bg-red-100 text-red-700",         icon: ThumbsDown, iconColor: "text-red-500"     },
+  "Baik":       { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700", icon: ThumbsUp,   iconColor: "text-emerald-500" },
+  "Tidak Baik": { bg: "bg-red-50",     border: "border-red-200",     badge: "bg-red-100 text-red-700",         icon: ThumbsDown, iconColor: "text-red-500"     },
 };
 
 function KesimpulanCard({ k }) {
-  const cfg  = PENILAIAN_CFG[k.Penilaian] ?? PENILAIAN_CFG["Cukup"];
+  const cfg  = PENILAIAN_CFG[k.Penilaian] ?? PENILAIAN_CFG["Tidak Baik"];
   const Icon = cfg.icon;
   const tgl  = k.Tgl_Input
     ? new Date(k.Tgl_Input).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -265,6 +276,16 @@ const fmtDate = (d) =>
         year: "numeric",
       })
     : null;
+
+const fmtDurasi = (menit) => {
+  const m = parseFloat(menit);
+  if (!m || isNaN(m)) return null;
+  const jam  = Math.floor(m / 60);
+  const sisa = Math.round(m % 60);
+  if (jam === 0) return `${sisa} mnt`;
+  if (sisa === 0) return `${jam} jam`;
+  return `${jam} jam ${sisa} mnt`;
+};
 const fmtDateTime = (d) =>
   d
     ? new Date(d).toLocaleString("id-ID", {
@@ -285,14 +306,23 @@ export default function OkQualityDetail() {
   const { canKesimpulan } = useAuth();
   const [data,       setData]       = useState(null);
   const [kesimpulan, setKesimpulan] = useState(null);
+  const [penandaan,  setPenandaan]  = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [showKesimpulanModal, setShowKesimpulanModal] = useState(false);
+  const [photoModalOpen,      setPhotoModalOpen]      = useState(false);
 
   useEffect(() => {
     Promise.all([getById(id), getKesimpulan(id)])
       .then(([detailRes, kesimpulanRes]) => {
-        setData(detailRes.data);
+        const d = detailRes.data;
+        setData(d);
         setKesimpulan(kesimpulanRes.data || null);
+        // Load penandaan setelah No_Reg diketahui
+        if (d?.No_Reg) {
+          getPenandaan(d.No_Reg)
+            .then((r) => setPenandaan(r.data || null))
+            .catch(() => {});
+        }
       })
       .catch(() => {
         Swal.fire({ icon: "error", title: "Gagal memuat detail", timer: 2000, showConfirmButton: false });
@@ -308,6 +338,11 @@ export default function OkQualityDetail() {
       </div>
     );
   if (!data) return null;
+
+  // Durasi dihitung manual dari Jam_OP – JamSelesai_OP
+  const durasiManualMenit  = calcDurasi(data.Jam_OP, data.JamSelesai_OP);
+  const durasiManualStr    = fmtDurasi(durasiManualMenit);
+  const durasiTercatatStr  = fmtDurasi(data.Durasi);
 
   const hasGCSBefore =
     data.GCS_Before_E || data.GCS_Before_M || data.GCS_Before_V;
@@ -330,7 +365,7 @@ export default function OkQualityDetail() {
       {/* Back + Actions */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate("/ok-quality")}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -394,25 +429,96 @@ export default function OkQualityDetail() {
           <StatusBadge tahap={data.Tahap_Selesai} status={data.Status} />
         </div>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mb-5 pb-5 border-b border-gray-100 text-xs text-gray-500">
+        {/* ── Info cards: Kamar · DPJP · Asal Pasien ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          {/* Kamar */}
+          <div className="flex items-center gap-3 bg-[#2d6a4f]/5 border border-[#2d6a4f]/15 rounded-xl px-4 py-3">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-[#2d6a4f]/10 flex items-center justify-center">
+              <BedDouble className="w-4 h-4 text-[#2d6a4f]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Kamar Operasi</p>
+              <p className="text-sm font-bold text-gray-800 truncate">{data.Kamar || "—"}</p>
+            </div>
+          </div>
+
+          {/* DPJP */}
+          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <Stethoscope className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">DPJP</p>
+              <p className="text-sm font-bold text-gray-800 truncate">
+                {data.DPJP_Nama || data.DPJP || "—"}
+              </p>
+              {data.DPJP_Nama && data.DPJP && (
+                <p className="text-[11px] text-gray-400">Kode: {data.DPJP}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Asal Pasien */}
+          <div className="flex items-center gap-3 bg-sky-50 border border-sky-100 rounded-xl px-4 py-3">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-sky-100 flex items-center justify-center">
+              <User className="w-4 h-4 text-sky-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Asal Pasien</p>
+              <p className="text-sm font-bold text-gray-800 truncate">{data.Asal_Pasien || "—"}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Waktu & Durasi operasi ── */}
+        {(data.Jam_OP || data.JamSelesai_OP || durasiManualStr || durasiTercatatStr) && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            {/* Jam operasi */}
+            {(data.Jam_OP || data.JamSelesai_OP) && (
+              <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                <Clock className="w-4 h-4 text-[#2d6a4f] shrink-0" />
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Jam Operasi</p>
+                  <p className="text-sm font-bold text-gray-800 leading-tight">
+                    {data.Jam_OP ?? "—"}
+                    {data.JamSelesai_OP && <span className="text-gray-400 font-normal mx-1">–</span>}
+                    {data.JamSelesai_OP ?? ""}
+                  </p>
+                </div>
+              </div>
+            )}
+            {/* Durasi dihitung (jam–jam selesai) */}
+            {durasiManualStr && (
+              <div className="flex items-center gap-2.5 bg-[#2d6a4f]/5 border border-[#2d6a4f]/15 rounded-xl px-4 py-2.5">
+                <Timer className="w-4 h-4 text-[#2d6a4f] shrink-0" />
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Aktual</p>
+                  <p className="text-sm font-bold text-[#2d6a4f] leading-tight">{durasiManualStr}</p>
+                  <p className="text-[10px] text-gray-400">Dihitung dari jam mulai–selesai</p>
+                </div>
+              </div>
+            )}
+            {/* Durasi tercatat di tabel */}
+            {durasiTercatatStr && (
+              <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+                <Timer className="w-4 h-4 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Tercatat</p>
+                  <p className="text-sm font-bold text-amber-700 leading-tight">{durasiTercatatStr}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Strip bawah: tanggal · user input ── */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-5 pb-5 border-b border-gray-100 text-xs text-gray-400">
           <span className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             {fmtDate(data.Tanggal) ?? "—"}
           </span>
-          {data.Kode_Ruang && (
-            <span className="flex items-center gap-1.5">
-              <BedDouble className="w-3.5 h-3.5" />
-              {data.Kode_Ruang}
-            </span>
-          )}
-          {data.Asal_Pasien && (
-            <span className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" />
-              {data.Asal_Pasien}
-            </span>
-          )}
           {data.NamaUser && (
-            <span className="text-gray-400 ml-auto">
+            <span className="ml-auto">
               Diisi: <strong className="text-gray-600">{data.NamaUser}</strong>
               {data.Tgl_Update && ` · ${fmtDateTime(data.Tgl_Update)}`}
             </span>
@@ -424,6 +530,84 @@ export default function OkQualityDetail() {
 
       {/* ── KESIMPULAN DOKTER ───────────────────────────────────────────────── */}
       {kesimpulan && <KesimpulanCard k={kesimpulan} />}
+
+      {/* ── PENANDAAN LOKASI OPERASI ─────────────────────────────────────────── */}
+      {penandaan && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-purple-50 text-purple-500">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-700">Penandaan Lokasi Operasi</h3>
+          </div>
+          <div className="p-5 flex flex-col items-center gap-4">
+            {/* Foto */}
+            <div className="w-full max-w-sm">
+              {penandaan.Photo ? (
+                <>
+                  <div
+                    onClick={() => setPhotoModalOpen(true)}
+                    className="relative cursor-zoom-in rounded-xl overflow-hidden border border-gray-100 bg-gray-50 group"
+                    style={{ minHeight: 140 }}
+                  >
+                    <img
+                      src={`data:image/jpeg;base64,${penandaan.Photo}`}
+                      alt="Penandaan lokasi"
+                      className="w-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs rounded-full px-3 py-1.5 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5" /> Perbesar
+                      </span>
+                    </div>
+                  </div>
+                  {/* Modal foto */}
+                  {photoModalOpen && (
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                      onClick={() => setPhotoModalOpen(false)}
+                    >
+                      <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setPhotoModalOpen(false)}
+                          className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                          <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-purple-500" />
+                            <span className="text-sm font-semibold text-gray-700">Foto Penandaan Lokasi Operasi</span>
+                          </div>
+                          <div className="p-4 flex items-center justify-center bg-gray-50">
+                            <img
+                              src={`data:image/jpeg;base64,${penandaan.Photo}`}
+                              alt="Penandaan lokasi"
+                              className="max-h-[70vh] max-w-full object-contain rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-gray-400 gap-2">
+                  <ImageOff className="w-6 h-6" />
+                  <span className="text-xs">Foto belum tersedia</span>
+                </div>
+              )}
+            </div>
+
+            {/* Prosedur */}
+            {penandaan.Prosedur && (
+              <div className="w-full max-w-sm text-center">
+                <p className="text-sm text-gray-700 leading-relaxed">{penandaan.Prosedur}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── PERBANDINGAN GCS ─────────────────────────────────────────────────── */}
       {hasGCS && (
@@ -560,8 +744,19 @@ export default function OkQualityDetail() {
                 </p>
               ) : (
                 <div className="space-y-3">
+                  {(data.DPJP_Nama || data.DPJP) && (
+                    <InfoRow
+                      label="DPJP"
+                      value={data.DPJP_Nama
+                        ? `${data.DPJP_Nama}${data.DPJP ? ` (${data.DPJP})` : ""}`
+                        : data.DPJP}
+                    />
+                  )}
+                  {data.Kamar && (
+                    <InfoRow label="Kamar Operasi" value={data.Kamar} />
+                  )}
                   <InfoRow label="Diagnosa" value={data.Diagnosa} />
-                  <InfoRow label="Tindakan" value={data.Tindakan} />
+                  <InfoRow label="Tindakan" value={data.Tindakan || data.Tindakan_Jadwal} />
                   <InfoRow
                     label="Penyakit Penyerta"
                     value={data.Penyakit_Penyerta}

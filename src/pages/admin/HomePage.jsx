@@ -3,11 +3,84 @@ import { useNavigate } from "react-router-dom";
 import {
   Sun, Sunrise, Moon, Eye, Pencil, Plus, RefreshCw,
   ClipboardList, CheckCircle2, Clock, AlertCircle, Loader2,
-  Search, Filter, X, CalendarDays, ClipboardCheck,
+  Search, Filter, X, CalendarDays, ClipboardCheck, Timer,
+  ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getAll, getStats } from "../../services/ok_quality.service";
 import KesimpulanModal from "../ok-quality/KesimpulanModal";
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+function Pagination({ pagination, limit = 20, onPage }) {
+  const { page, totalPages, total } = pagination;
+  const from = total === 0 ? 0 : (page - 1) * limit + 1;
+  const to   = Math.min(page * limit, total);
+
+  const delta = 2;
+  const pages = [];
+  for (let i = Math.max(1, page - delta); i <= Math.min(totalPages, page + delta); i++) {
+    pages.push(i);
+  }
+
+  if (totalPages <= 1) return (
+    <p className="text-xs text-gray-400 text-center mt-2">
+      Menampilkan {total} data
+    </p>
+  );
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 px-1">
+      <p className="text-xs text-gray-500 order-2 sm:order-1">
+        Menampilkan <strong className="text-gray-700">{from}–{to}</strong> dari <strong className="text-gray-700">{total}</strong> data
+      </p>
+      <div className="flex items-center gap-1 order-1 sm:order-2">
+        <button
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" /> Prev
+        </button>
+
+        {pages[0] > 1 && (
+          <>
+            <button onClick={() => onPage(1)} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">1</button>
+            {pages[0] > 2 && <span className="text-gray-400 text-xs px-1">…</span>}
+          </>
+        )}
+
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => onPage(p)}
+            className={`w-8 h-8 text-xs rounded-lg border font-semibold transition-colors ${
+              p === page
+                ? "bg-[#2d6a4f] border-[#2d6a4f] text-white"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+
+        {pages[pages.length - 1] < totalPages && (
+          <>
+            {pages[pages.length - 1] < totalPages - 1 && <span className="text-gray-400 text-xs px-1">…</span>}
+            <button onClick={() => onPage(totalPages)} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">{totalPages}</button>
+          </>
+        )}
+
+        <button
+          disabled={page >= totalPages}
+          onClick={() => onPage(page + 1)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Next <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Greeting ─────────────────────────────────────────────────────────────────
 function getGreeting() {
@@ -77,9 +150,8 @@ function StatusBadge({ tahap = 0, status }) {
 
 // ── Kesimpulan badge ──────────────────────────────────────────────────────────
 const KESIMPULAN_STYLE = {
-  Baik:   "bg-emerald-100 text-emerald-700",
-  Cukup:  "bg-amber-100  text-amber-700",
-  Kurang: "bg-red-100    text-red-700",
+  "Baik":       "bg-emerald-100 text-emerald-700",
+  "Tidak Baik": "bg-red-100    text-red-700",
 };
 
 function KesimpulanBadge({ penilaian }) {
@@ -92,6 +164,17 @@ function KesimpulanBadge({ penilaian }) {
   );
 }
 
+// ── Format durasi menit → "X jam Y mnt" ──────────────────────────────────────
+function fmtDurasi(menit) {
+  const m = parseFloat(menit);
+  if (!m || isNaN(m)) return null;
+  const jam  = Math.floor(m / 60);
+  const sisa = Math.round(m % 60);
+  if (jam === 0) return `${sisa} mnt`;
+  if (sisa === 0) return `${jam} jam`;
+  return `${jam} jam ${sisa} mnt`;
+}
+
 // ── Patient card ──────────────────────────────────────────────────────────────
 function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
   const nama     = row.Nama_Pasien ?? "-";
@@ -99,6 +182,11 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
   const tanggal  = row.Tanggal
     ? new Date(row.Tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
     : "-";
+
+  const jamOP = row.Jam_OP
+    ? (row.JamSelesai_OP ? `${row.Jam_OP} – ${row.JamSelesai_OP}` : row.Jam_OP)
+    : null;
+  const durasi = fmtDurasi(row.Durasi);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col gap-3">
@@ -125,7 +213,21 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
       )}
 
       <div className="flex items-center justify-between pt-1 border-t border-gray-50">
-        <span className="text-[11px] text-gray-400">{tanggal}</span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[11px] text-gray-400">{tanggal}</span>
+          {(jamOP || durasi) && (
+            <span className="flex items-center gap-1 text-[11px] text-gray-500">
+              <Timer className="w-3 h-3 shrink-0 text-[#2d6a4f]" />
+              {jamOP && <span className="font-medium text-gray-700">{jamOP}</span>}
+              {jamOP && durasi && <span className="text-gray-300">·</span>}
+              {durasi && (
+                <span>
+                  Durasi Operasi: <strong className="text-[#2d6a4f]">{durasi}</strong>
+                </span>
+              )}
+            </span>
+          )}
+        </div>
         <div className="flex gap-1">
           <button onClick={() => onView(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" title="Lihat detail">
             <Eye className="w-3.5 h-3.5" />
@@ -197,31 +299,62 @@ export default function HomePage() {
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
-  const [stats,           setStats]           = useState({ total: 0, selesai: 0, draft: 0, inProgress: 0 });
+  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanBaik: 0, kesimpulanTidakBaik: 0 });
   const [loading,         setLoading]         = useState(true);
   const [refreshing,      setRefreshing]      = useState(false);
   const [showFilters,     setShowFilters]     = useState(false);
   const [pagination,      setPagination]      = useState({ page: 1, totalPages: 1, total: 0 });
   const [kesimpulanModal, setKesimpulanModal] = useState(null); // { id, nama, noReg }
 
-  // ── Filter state ────────────────────────────────────────────────────────────
-  const [searchInput,    setSearchInput]    = useState("");
-  const [activeSearch,   setActiveSearch]   = useState("");
-  const [statusFilter,   setStatusFilter]   = useState("");   // "selesai" | "draft" | ""
-  const [tahapFilter,    setTahapFilter]    = useState("");   // "0"|"1"|"2"|"3"|""
-  const [penilaianFilter, setPenilaianFilter] = useState(""); // "Baik"|"Cukup"|"Kurang"|""
-  const [tanggalDari,    setTanggalDari]    = useState("");
-  const [tanggalSampai,  setTanggalSampai]  = useState("");
+  // ── Default filter: 3 bulan terakhir ────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const threeMonthsAgo = (() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10);
+  })();
 
-  // ── Fetch stats (selalu dari keseluruhan data, tidak terpengaruh filter) ────
-  const fetchStats = useCallback(async () => {
+  // ── Restore filter dari sessionStorage (persist antar navigasi) ────────────
+  const FILTER_KEY = "beranda_filters";
+  const savedFilters = (() => {
+    try { return JSON.parse(sessionStorage.getItem(FILTER_KEY)) || {}; } catch { return {}; }
+  })();
+
+  const [searchInput,     setSearchInput]     = useState(savedFilters.searchInput     ?? "");
+  const [activeSearch,    setActiveSearch]     = useState(savedFilters.activeSearch    ?? "");
+  const [statusFilter,    setStatusFilter]     = useState(savedFilters.statusFilter    ?? "");
+  const [tahapFilter,     setTahapFilter]      = useState(savedFilters.tahapFilter     ?? "");
+  const [penilaianFilter, setPenilaianFilter]  = useState(savedFilters.penilaianFilter ?? "");
+  const [tanggalDari,     setTanggalDari]      = useState(savedFilters.tanggalDari     ?? threeMonthsAgo);
+  const [tanggalSampai,   setTanggalSampai]    = useState(savedFilters.tanggalSampai   ?? today);
+
+  // ── Simpan filter ke sessionStorage setiap kali berubah ──────────────────
+  useEffect(() => {
+    sessionStorage.setItem(FILTER_KEY, JSON.stringify({
+      searchInput, activeSearch, statusFilter, tahapFilter,
+      penilaianFilter, tanggalDari, tanggalSampai,
+    }));
+  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai]);
+
+  // ── Bangun filter params (dipakai bersama fetchData & fetchStats) ──────────
+  const buildFilterParams = useCallback(() => ({
+    ...(activeSearch       && { search: activeSearch }),
+    ...(statusFilter       && { status: statusFilter }),
+    ...(tahapFilter !== "" && { tahap: tahapFilter }),
+    ...(penilaianFilter    && { penilaian: penilaianFilter }),
+    ...(tanggalDari        && { tanggal_dari: tanggalDari }),
+    ...(tanggalSampai      && { tanggal_sampai: tanggalSampai }),
+  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai]);
+
+  // ── Fetch stats — mengikuti filter aktif ─────────────────────────────────
+  const fetchStats = useCallback(async (filterParams = {}) => {
     try {
-      const res = await getStats();
+      const res = await getStats(filterParams);
       const d   = res.data || {};
       setStats({
-        total:      d.total       || 0,
-        selesai:    d.selesai     || 0,
-        inProgress: d.in_progress || 0,
+        total:               d.total                  || 0,
+        selesai:             d.selesai                || 0,
+        inProgress:          d.in_progress            || 0,
+        kesimpulanBaik:      d.kesimpulan_baik        || 0,
+        kesimpulanTidakBaik: d.kesimpulan_tidak_baik  || 0,
       });
     } catch {
       // silent
@@ -233,29 +366,23 @@ export default function HomePage() {
     const isRefresh = opts.refresh ?? false;
     const page      = opts.page ?? 1;
     if (isRefresh) setRefreshing(true); else setLoading(true);
+    const filterParams = buildFilterParams();
     try {
-      const params = {
-        page, limit: 20,
-        ...(activeSearch       && { search: activeSearch }),
-        ...(statusFilter       && { status: statusFilter }),
-        ...(tahapFilter !== "" && { tahap: tahapFilter }),
-        ...(penilaianFilter    && { penilaian: penilaianFilter }),
-        ...(tanggalDari        && { tanggal_dari: tanggalDari }),
-        ...(tanggalSampai      && { tanggal_sampai: tanggalSampai }),
-      };
-      const res = await getAll(params);
-      setData(res.data || []);
-      setPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+      const [listRes] = await Promise.all([
+        getAll({ page, limit: 20, ...filterParams }),
+        fetchStats(filterParams),
+      ]);
+      setData(listRes.data || []);
+      setPagination(listRes.pagination || { page: 1, totalPages: 1, total: 0 });
     } catch {
       // silent
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai]);
+  }, [buildFilterParams, fetchStats]);
 
-  // Stats load sekali saat mount, data load ulang tiap filter berubah
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  // Jalankan saat filter berubah
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -273,7 +400,7 @@ export default function HomePage() {
     setSearchInput(""); setActiveSearch("");
     setStatusFilter(""); setTahapFilter("");
     setPenilaianFilter("");
-    setTanggalDari(""); setTanggalSampai("");
+    setTanggalDari(threeMonthsAgo); setTanggalSampai(today);
   };
 
   const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai;
@@ -307,7 +434,7 @@ export default function HomePage() {
             <h1 className="text-lg sm:text-xl font-extrabold text-white truncate">{displayName}</h1>
           </div>
           <button
-            onClick={() => { fetchStats(); fetchData({ refresh: true }); }}
+            onClick={() => fetchData({ refresh: true })}
             disabled={refreshing}
             className="ml-auto p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white"
             title="Refresh"
@@ -317,11 +444,13 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Stat cards (klikable jadi filter) ────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard label="Total Penilaian" value={stats.total}      color="bg-white border-gray-100"        icon={<ClipboardList className="w-4 h-4 text-[#2d6a4f]" />}   active={false}                                         onClick={resetFilters} />
-        <StatCard label="Selesai"         value={stats.selesai}    color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2  className="w-4 h-4 text-emerald-500" />}  active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
-        <StatCard label="Sedang Berjalan" value={stats.inProgress} color="bg-amber-50 border-amber-100"    icon={<Clock         className="w-4 h-4 text-amber-500" />}    active={statusFilter === "draft" && tahapFilter === ""} onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setActiveSearch(""); setSearchInput(""); }} />
+      {/* ── Stat cards (klikable jadi filter, mengikuti filter aktif) ──────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <StatCard label="Total Penilaian"  value={stats.total}               color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter}              onClick={resetFilters} />
+        <StatCard label="Selesai"          value={stats.selesai}             color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2   className="w-4 h-4 text-emerald-500" />} active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
+        <StatCard label="Sedang Berjalan"  value={stats.inProgress}          color="bg-amber-50 border-amber-100"     icon={<Clock          className="w-4 h-4 text-amber-500"   />} active={statusFilter === "draft"}                      onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setPenilaianFilter(""); setActiveSearch(""); setSearchInput(""); }} />
+        <StatCard label="Kesimpulan Baik"  value={stats.kesimpulanBaik}      color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Baik"}                    onClick={() => { setPenilaianFilter((p) => p === "Baik" ? "" : "Baik"); setStatusFilter(""); }} />
+        <StatCard label="Tidak Baik"       value={stats.kesimpulanTidakBaik} color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Tidak Baik"}              onClick={() => { setPenilaianFilter((p) => p === "Tidak Baik" ? "" : "Tidak Baik"); setStatusFilter(""); }} />
       </div>
 
       {/* ── Cards section ────────────────────────────────────────────────── */}
@@ -419,8 +548,7 @@ export default function HomePage() {
                 >
                   <option value="">— Semua Penilaian —</option>
                   <option value="Baik">Baik</option>
-                  <option value="Cukup">Cukup</option>
-                  <option value="Kurang">Kurang</option>
+                  <option value="Tidak Baik">Tidak Baik</option>
                 </select>
               </div>
 
@@ -516,29 +644,11 @@ export default function HomePage() {
             </div>
 
             {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-xs text-gray-500">
-                  Halaman {pagination.page} dari {pagination.totalPages}
-                </p>
-                <div className="flex gap-1.5">
-                  <button
-                    disabled={pagination.page <= 1}
-                    onClick={() => fetchData({ page: pagination.page - 1 })}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    disabled={pagination.page >= pagination.totalPages}
-                    onClick={() => fetchData({ page: pagination.page + 1 })}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              limit={20}
+              onPage={(p) => fetchData({ page: p })}
+            />
 
             {/* Lihat semua */}
             <div className="mt-4 text-center">
@@ -560,7 +670,7 @@ export default function HomePage() {
           namaPassien={kesimpulanModal.nama}
           noReg={kesimpulanModal.noReg}
           onClose={() => setKesimpulanModal(null)}
-          onSaved={() => { fetchData(); fetchStats(); }}
+          onSaved={() => fetchData()}
         />
       )}
     </div>

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Activity,
+  CalendarDays,
 } from "lucide-react";
 import logoImage from "../assets/logo-urip.png";
 import { useAuth } from "../context/AuthContext";
@@ -24,7 +25,12 @@ const menuItems = [
     icon: <LayoutDashboard className="w-5 h-5 shrink-0" />,
   },
   {
-    name: "OK Quality",
+    name: "Jadwal Operasi",
+    path: "/jadwal-operasi",
+    icon: <CalendarDays className="w-5 h-5 shrink-0" />,
+  },
+  {
+    name: "Daftar Penilaian",
     path: "/ok-quality",
     icon: <ClipboardList className="w-5 h-5 shrink-0" />,
   },

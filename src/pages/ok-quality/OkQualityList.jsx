@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAll } from "../../services/ok_quality.service";
 import KesimpulanModal from "./KesimpulanModal";
 import { useAuth } from "../../context/AuthContext";
@@ -29,9 +29,8 @@ function StatusBadge({ tahap = 0, status }) {
 
 // ── Kesimpulan badge ──────────────────────────────────────────────────────────
 const KESIMPULAN_STYLE = {
-  Baik:   "bg-emerald-100 text-emerald-700",
-  Cukup:  "bg-amber-100  text-amber-700",
-  Kurang: "bg-red-100    text-red-700",
+  "Baik":       "bg-emerald-100 text-emerald-700",
+  "Tidak Baik": "bg-red-100    text-red-700",
 };
 
 function KesimpulanBadge({ penilaian }) {
@@ -55,6 +54,85 @@ function ProgressBar({ tahap = 0 }) {
         }`}
         style={{ width: `${pct}%` }}
       />
+    </div>
+  );
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+function Pagination({ pagination, onPage }) {
+  const { page, totalPages, total } = pagination;
+  const limit = 15;
+  const from  = total === 0 ? 0 : (page - 1) * limit + 1;
+  const to    = Math.min(page * limit, total);
+
+  // Buat array halaman: selalu tampilkan maks 5 nomor di sekitar halaman aktif
+  const pages = [];
+  const delta = 2;
+  for (let i = Math.max(1, page - delta); i <= Math.min(totalPages, page + delta); i++) {
+    pages.push(i);
+  }
+
+  if (totalPages <= 1) return (
+    <p className="text-xs text-gray-400 text-center mt-4">
+      Menampilkan {total} data
+    </p>
+  );
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 px-1">
+      <p className="text-xs text-gray-500 order-2 sm:order-1">
+        Menampilkan <strong className="text-gray-700">{from}–{to}</strong> dari <strong className="text-gray-700">{total}</strong> data
+      </p>
+      <div className="flex items-center gap-1 order-1 sm:order-2">
+        {/* Prev */}
+        <button
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" /> Prev
+        </button>
+
+        {/* First page + ellipsis */}
+        {pages[0] > 1 && (
+          <>
+            <button onClick={() => onPage(1)} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">1</button>
+            {pages[0] > 2 && <span className="text-gray-400 text-xs px-1">…</span>}
+          </>
+        )}
+
+        {/* Page numbers */}
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => onPage(p)}
+            className={`w-8 h-8 text-xs rounded-lg border font-semibold transition-colors ${
+              p === page
+                ? "bg-[#2d6a4f] border-[#2d6a4f] text-white"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+
+        {/* Last page + ellipsis */}
+        {pages[pages.length - 1] < totalPages && (
+          <>
+            {pages[pages.length - 1] < totalPages - 1 && <span className="text-gray-400 text-xs px-1">…</span>}
+            <button onClick={() => onPage(totalPages)} className="w-8 h-8 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">{totalPages}</button>
+          </>
+        )}
+
+        {/* Next */}
+        <button
+          disabled={page >= totalPages}
+          onClick={() => onPage(page + 1)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Next <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -139,8 +217,7 @@ export default function OkQualityList() {
         >
           <option value="">— Semua Penilaian —</option>
           <option value="Baik">Baik</option>
-          <option value="Cukup">Cukup</option>
-          <option value="Kurang">Kurang</option>
+          <option value="Tidak Baik">Tidak Baik</option>
         </select>
       </div>
 
@@ -291,28 +368,8 @@ export default function OkQualityList() {
       )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-xs text-gray-500">
-            Halaman {pagination.page} dari {pagination.totalPages}
-          </p>
-          <div className="flex gap-1.5">
-            <button
-              disabled={pagination.page <= 1}
-              onClick={() => fetchData(pagination.page - 1)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ← Prev
-            </button>
-            <button
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => fetchData(pagination.page + 1)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next →
-            </button>
-          </div>
-        </div>
+      {pagination.totalPages > 0 && (
+        <Pagination pagination={pagination} onPage={fetchData} />
       )}
     </div>
   );

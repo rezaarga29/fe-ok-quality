@@ -3,12 +3,11 @@ import { X, ClipboardCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { getKesimpulan, createKesimpulan, updateKesimpulan } from "../../services/ok_quality.service";
 import Swal from "sweetalert2";
 
-const PENILAIAN_OPTIONS = ["Baik", "Cukup", "Kurang"];
+const PENILAIAN_OPTIONS = ["Baik", "Tidak Baik"];
 
 const PENILAIAN_STYLE = {
-  Baik:   "bg-emerald-100 text-emerald-700 border-emerald-300",
-  Cukup:  "bg-amber-100  text-amber-700  border-amber-300",
-  Kurang: "bg-red-100    text-red-700    border-red-300",
+  "Baik":      "bg-emerald-100 text-emerald-700 border-emerald-300",
+  "Tidak Baik": "bg-red-100    text-red-700    border-red-300",
 };
 
 export default function KesimpulanModal({ penilaianId, namaPassien, noReg, onClose, onSaved }) {
