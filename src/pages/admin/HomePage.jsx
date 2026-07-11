@@ -197,6 +197,9 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-800 text-sm truncate">{nama}</p>
           <p className="text-[11px] text-gray-400 font-mono">{row.No_Reg} · {row.No_MR ?? "-"}</p>
+          {row.No_Jadwal && (
+            <p className="text-[10px] text-emerald-700 font-mono mt-0.5">Jadwal: {row.No_Jadwal}</p>
+          )}
         </div>
         <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
       </div>
@@ -499,7 +502,7 @@ export default function HomePage() {
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Cari No. Reg, No. MR, atau nama pasien..."
+                  placeholder="Cari No. Reg, No. MR, No. Jadwal, atau nama pasien..."
                   className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f]"
                 />
               </div>

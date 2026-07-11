@@ -406,7 +406,7 @@ export default function JadwalOperasiPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Ketik No. MR, Nama Pasien, atau No. Reg..."
+                  placeholder="Ketik No. MR, No. Reg, No. Jadwal, atau Nama Pasien..."
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -530,6 +530,9 @@ export default function JadwalOperasiPage() {
                             <span className="text-gray-200">·</span>
                             <span>{row.No_Reg || "-"}</span>
                           </div>
+                          <div className="text-[11px] font-mono text-emerald-700 mt-0.5">
+                            Jadwal: {row.No_Jadwal || "-"}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -594,6 +597,7 @@ export default function JadwalOperasiPage() {
                       <div>
                         <p className="font-bold text-gray-900 text-sm leading-tight">{row.Nama_Pasien || "-"}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{row.No_MR} · {row.No_Reg}</p>
+                        <p className="text-[11px] font-mono text-emerald-700 mt-0.5">Jadwal: {row.No_Jadwal || "-"}</p>
                       </div>
                       <StepBadge row={row} />
                     </div>

@@ -207,16 +207,6 @@ function VitalsPanel({ td, tdper, hr, suhu, rr, label, color, showRR }) {
   );
 }
 
-// ── Hitung durasi manual dari HH:MM – HH:MM ──────────────────────────────────
-function calcDurasi(jamMulai, jamSelesai) {
-  if (!jamMulai || !jamSelesai) return null;
-  const [h1, m1] = jamMulai.split(":").map(Number);
-  const [h2, m2] = jamSelesai.split(":").map(Number);
-  let menit = h2 * 60 + m2 - (h1 * 60 + m1);
-  if (menit < 0) menit += 24 * 60;
-  return menit;
-}
-
 // ── Kesimpulan card ───────────────────────────────────────────────────────────
 const PENILAIAN_CFG = {
   "Baik":       { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700", icon: ThumbsUp,   iconColor: "text-emerald-500" },
@@ -339,10 +329,8 @@ export default function OkQualityDetail() {
     );
   if (!data) return null;
 
-  // Durasi dihitung manual dari Jam_OP – JamSelesai_OP
-  const durasiManualMenit  = calcDurasi(data.Jam_OP, data.JamSelesai_OP);
-  const durasiManualStr    = fmtDurasi(durasiManualMenit);
-  const durasiTercatatStr  = fmtDurasi(data.Durasi);
+  // Durasi operasi dari kolom Durasi (JADWAL_OPERASI)
+  const durasiOperasiStr = fmtDurasi(data.Durasi);
 
   const hasGCSBefore =
     data.GCS_Before_E || data.GCS_Before_M || data.GCS_Before_V;
@@ -414,6 +402,11 @@ export default function OkQualityDetail() {
               <span className="text-xs text-gray-400 font-mono">
                 No. MR: {data.No_MR ?? "—"}
               </span>
+              {data.No_Jadwal && (
+                <span className="text-xs text-emerald-700 font-mono">
+                  No. Jadwal: {data.No_Jadwal}
+                </span>
+              )}
               {data.Tgl_Lahir && (
                 <span className="text-xs text-gray-400">
                   {fmtDate(data.Tgl_Lahir)}
@@ -471,7 +464,7 @@ export default function OkQualityDetail() {
         </div>
 
         {/* ── Waktu & Durasi operasi ── */}
-        {(data.Jam_OP || data.JamSelesai_OP || durasiManualStr || durasiTercatatStr) && (
+        {(data.Jam_OP || data.JamSelesai_OP || durasiOperasiStr) && (
           <div className="flex flex-wrap gap-3 mb-4">
             {/* Jam operasi */}
             {(data.Jam_OP || data.JamSelesai_OP) && (
@@ -487,24 +480,13 @@ export default function OkQualityDetail() {
                 </div>
               </div>
             )}
-            {/* Durasi dihitung (jam–jam selesai) */}
-            {durasiManualStr && (
+            {/* Durasi operasi (kolom Durasi) */}
+            {durasiOperasiStr && (
               <div className="flex items-center gap-2.5 bg-[#2d6a4f]/5 border border-[#2d6a4f]/15 rounded-xl px-4 py-2.5">
                 <Timer className="w-4 h-4 text-[#2d6a4f] shrink-0" />
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Aktual</p>
-                  <p className="text-sm font-bold text-[#2d6a4f] leading-tight">{durasiManualStr}</p>
-                  <p className="text-[10px] text-gray-400">Dihitung dari jam mulai–selesai</p>
-                </div>
-              </div>
-            )}
-            {/* Durasi tercatat di tabel */}
-            {durasiTercatatStr && (
-              <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
-                <Timer className="w-4 h-4 text-amber-500 shrink-0" />
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Tercatat</p>
-                  <p className="text-sm font-bold text-amber-700 leading-tight">{durasiTercatatStr}</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Operasi</p>
+                  <p className="text-sm font-bold text-[#2d6a4f] leading-tight">{durasiOperasiStr}</p>
                 </div>
               </div>
             )}
