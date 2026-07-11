@@ -279,6 +279,7 @@ export default function OkQualityForm() {
   // ── Form state ─────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
     No_Reg: "",
+    No_Jadwal: "", // 1 No_Reg bisa punya >1 jadwal operasi
     No_MR: "",
     Nama_Pasien: "",
     // Tahap 1
@@ -323,6 +324,7 @@ export default function OkQualityForm() {
   useEffect(() => {
     if (!isEdit) return;
     setLoading(true);
+    setRecordId(id); // sinkronkan saat pindah antar id (mis. redirect 409)
     getById(id)
       .then((res) => {
         const d = res.data;
@@ -380,6 +382,7 @@ export default function OkQualityForm() {
     // Pre-fill field yang ada di jadwal (tanpa tunggu autoFill)
     setForm((f) => {
       const next = { ...f, No_Reg: noReg };
+      if (jadwalFromState.No_Jadwal) next.No_Jadwal = jadwalFromState.No_Jadwal;
       if (jadwalFromState.No_MR) next.No_MR = jadwalFromState.No_MR;
       if (jadwalFromState.Nama_Pasien)
         next.Nama_Pasien = jadwalFromState.Nama_Pasien;
@@ -397,8 +400,9 @@ export default function OkQualityForm() {
     setAutoFillSrc({ "Jadwal Operasi": true });
 
     // Lanjut coba auto-fill tambahan dari tabel referensi
+    // Kirim No_Jadwal supaya data diambil dari jadwal yang tepat
     setAutoFilling(true);
-    getAutoFill(noReg)
+    getAutoFill(noReg, jadwalFromState.No_Jadwal)
       .then((res) => {
         const d = res.data;
         const newFilled = new Set(filled);
@@ -460,6 +464,7 @@ export default function OkQualityForm() {
     }
     setAutoFilling(true);
     try {
+      // Manual by No_Reg: BE ambil jadwal terbaru bila ada >1 jadwal
       const res = await getAutoFill(noRegInput.trim());
       const d = res.data;
       const filled = new Set();
@@ -467,6 +472,7 @@ export default function OkQualityForm() {
       setForm((f) => {
         const next = { ...f, No_Reg: noRegInput.trim() };
         const map = {
+          No_Jadwal: d.No_Jadwal,
           No_MR: d.No_MR,
           Nama_Pasien: d._pasien?.Nama_Pasien,
           Diagnosa: d.Diagnosa,
@@ -541,14 +547,16 @@ export default function OkQualityForm() {
     const noReg = row.No_Reg;
     setNoRegInput(noReg);
     set("No_Reg", noReg);
+    set("No_Jadwal", row.No_Jadwal || "");
     // Panggil autoFill untuk ambil data lengkap dari tabel referensi
+    // (kirim No_Jadwal — 1 No_Reg bisa punya >1 jadwal)
     setAutoFilling(true);
     try {
-      const res = await getAutoFill(noReg);
+      const res = await getAutoFill(noReg, row.No_Jadwal);
       const d = res.data;
       const filled = new Set();
       setForm((f) => {
-        const next = { ...f, No_Reg: noReg };
+        const next = { ...f, No_Reg: noReg, No_Jadwal: row.No_Jadwal || "" };
         const map = {
           No_MR: d.No_MR,
           Nama_Pasien: d._pasien?.Nama_Pasien,
@@ -680,11 +688,30 @@ export default function OkQualityForm() {
         });
       }
     } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: "Gagal menyimpan",
-        text: err?.response?.data?.message || err.message,
-      });
+      // 409 = jadwal ini sudah punya penilaian → tawarkan buka yang sudah ada
+      const existingId = err?.response?.status === 409
+        ? err?.response?.data?.data?.Id
+        : null;
+      if (existingId) {
+        const result = await Swal.fire({
+          icon: "info",
+          title: "Penilaian sudah ada",
+          text: "Jadwal operasi ini sudah memiliki penilaian. Buka penilaian tersebut?",
+          showCancelButton: true,
+          confirmButtonText: "Buka",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#2d6a4f",
+        });
+        if (result.isConfirmed) {
+          navigate(`/ok-quality/form/${existingId}`, { replace: true });
+        }
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal menyimpan",
+          text: err?.response?.data?.message || err.message,
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -750,6 +777,11 @@ export default function OkQualityForm() {
                         : ""}
                       {selectedJadwal.Kamar ? ` · ${selectedJadwal.Kamar}` : ""}
                     </p>
+                    {selectedJadwal.No_Jadwal && (
+                      <p className="text-xs text-emerald-700 mt-0.5 font-mono">
+                        No. Jadwal: <strong>{selectedJadwal.No_Jadwal}</strong>
+                      </p>
+                    )}
                     {(selectedJadwal.DPJP_Nama || selectedJadwal.DPJP) && (
                       <p className="text-xs text-emerald-700 mt-0.5 flex items-center gap-1">
                         <Stethoscope className="w-3 h-3 shrink-0" />
@@ -779,6 +811,7 @@ export default function OkQualityForm() {
                         setForm((f) => ({
                           ...f,
                           No_Reg: "",
+                          No_Jadwal: "",
                           No_MR: "",
                           Nama_Pasien: "",
                           Diagnosa: "",
@@ -824,7 +857,7 @@ export default function OkQualityForm() {
                         onKeyDown={(e) =>
                           e.key === "Enter" && handleJadwalSearch()
                         }
-                        placeholder="No. MR / No. Reg / Nama Pasien"
+                        placeholder="No. MR / No. Reg / No. Jadwal / Nama Pasien"
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f]"
                       />
                       <button
@@ -872,6 +905,10 @@ export default function OkQualityForm() {
                               No. Reg: <strong>{row.No_Reg}</strong>
                               {" · "}No. MR: <strong>{row.No_MR}</strong>
                               {row.Kamar ? ` · ${row.Kamar}` : ""}
+                            </div>
+                            <div className="text-[11px] text-emerald-700 font-mono mt-0.5">
+                              Jadwal: {row.No_Jadwal}
+                              {row.Jam ? ` · ${row.Jam}` : ""}
                             </div>
                             {row.Tindakan && (
                               <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">

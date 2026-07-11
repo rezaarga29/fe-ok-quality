@@ -197,7 +197,7 @@ export default function OkQualityList() {
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Cari No. Reg / No. MR..."
+              placeholder="Cari No. Reg / No. MR / No. Jadwal..."
               className="pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f]"
             />
           </div>
@@ -253,7 +253,12 @@ export default function OkQualityList() {
                 <tbody className="divide-y divide-gray-50">
                   {data.map((row) => (
                     <tr key={row.Id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-700">{row.No_Reg}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-700">
+                        {row.No_Reg}
+                        {row.No_Jadwal && (
+                          <p className="text-[10px] text-emerald-700 mt-0.5">Jadwal: {row.No_Jadwal}</p>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800 text-sm">{row.Nama_Pasien ?? "-"}</p>
                         <p className="text-xs text-gray-400">{row.No_MR}</p>
@@ -312,6 +317,9 @@ export default function OkQualityList() {
                     <div>
                       <p className="font-semibold text-gray-800 text-sm">{row.Nama_Pasien ?? "-"}</p>
                       <p className="text-xs text-gray-400 font-mono">{row.No_Reg}</p>
+                      {row.No_Jadwal && (
+                        <p className="text-[10px] text-emerald-700 font-mono mt-0.5">Jadwal: {row.No_Jadwal}</p>
+                      )}
                     </div>
                     <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
                   </div>

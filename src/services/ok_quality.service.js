@@ -28,8 +28,11 @@ export async function getJadwal(params = {}) {
 }
 
 // ── AUTO-FILL dari tabel referensi ──────────────────────────────────────────
-export async function getAutoFill(no_reg) {
-  const res = await axios.get(`${BASE}/autofill/${no_reg}`, cfg);
+// no_jadwal opsional — 1 no_reg bisa punya >1 jadwal operasi,
+// kirim no_jadwal agar Tindakan diambil dari jadwal yang tepat
+export async function getAutoFill(no_reg, no_jadwal = null) {
+  const params = no_jadwal ? { no_jadwal } : {};
+  const res = await axios.get(`${BASE}/autofill/${no_reg}`, { ...cfg, params });
   return res.data;
 }
 
@@ -72,3 +75,4 @@ export async function updateKesimpulan(id, data) {
   const res = await axios.put(`${BASE}/${id}/kesimpulan`, data, cfg);
   return res.data;
 }
+
