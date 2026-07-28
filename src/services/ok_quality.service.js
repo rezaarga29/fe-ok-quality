@@ -36,6 +36,12 @@ export async function getAutoFill(no_reg, no_jadwal = null) {
   return res.data;
 }
 
+// ── HASIL OPERASI (referensi read-only) ─────────────────────────────────────
+export async function getHasilOperasi(no_jadwal) {
+  const res = await axios.get(`${BASE}/hasil-operasi/${no_jadwal}`, cfg);
+  return res.data;
+}
+
 // ── CREATE ──────────────────────────────────────────────────────────────────
 export async function create(data) {
   const res = await axios.post(BASE, data, cfg);

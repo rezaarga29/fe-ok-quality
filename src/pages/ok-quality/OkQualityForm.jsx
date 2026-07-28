@@ -15,6 +15,7 @@ import {
   Stethoscope,
   MapPin,
   ImageOff,
+  Droplet,
 } from "lucide-react";
 import {
   getById,
@@ -22,6 +23,7 @@ import {
   getJadwal,
   create,
   updateTahap,
+  getHasilOperasi,
 } from "../../services/ok_quality.service";
 import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { getDokterList } from "../../services/dokter.service";
@@ -252,6 +254,7 @@ export default function OkQualityForm() {
   // ── Penandaan Lokasi Operasi (read-only dari tabel referensi) ────────────────
   const [penandaan, setPenandaan]       = useState(null); // { Prosedur, Photo (base64), Tgl_Pasien, Tgl_Dokter }
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [hasilOperasi, setHasilOperasi] = useState(null); // { DarahHilang, JumlahDarahHilang } dari JADWAL_OPERASI_HASIL — referensi saja
 
   // Load daftar dokter untuk react-select
   useEffect(() => {
@@ -618,6 +621,23 @@ export default function OkQualityForm() {
     if (jadwalFromState?.No_Reg) loadPenandaan(jadwalFromState.No_Reg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Load hasil operasi by No_Jadwal (read-only referensi) ─────────────────
+  const loadHasilOperasi = async (noJadwal) => {
+    if (!noJadwal) return;
+    try {
+      const res = await getHasilOperasi(noJadwal);
+      setHasilOperasi(res.success && res.data ? res.data : null);
+    } catch {
+      setHasilOperasi(null);
+    }
+  };
+
+  // Muat saat No_Jadwal tersedia di form (isi manual / dari JadwalOperasiPage)
+  useEffect(() => {
+    if (form.No_Jadwal) loadHasilOperasi(form.No_Jadwal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.No_Jadwal]);
 
   // ── Auto-fill "RECOVERY ROOM" saat masuk Tahap 3 ──────────────────────────
   useEffect(() => {
@@ -1227,6 +1247,23 @@ export default function OkQualityForm() {
           )}
 
           <Section title="Kondisi Selama Operasi">
+            {hasilOperasi && (hasilOperasi.DarahHilang || hasilOperasi.JumlahDarahHilang) && (
+              <div className="sm:col-span-2 flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5 text-xs text-rose-800 mb-2">
+                <Droplet className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                <span className="text-rose-500">Referensi dari data operasi:</span>
+                {hasilOperasi.DarahHilang && (
+                  <span>
+                    Darah Hilang: <strong>{hasilOperasi.DarahHilang}</strong>
+                  </span>
+                )}
+                {hasilOperasi.JumlahDarahHilang && (
+                  <span>
+                    · Jumlah Darah Hilang:{" "}
+                    <strong>{hasilOperasi.JumlahDarahHilang} CC</strong>
+                  </span>
+                )}
+              </div>
+            )}
             <div className="sm:col-span-2">
               <Field label="Pendarahan">
                 <SelectInput
