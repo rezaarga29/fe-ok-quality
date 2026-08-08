@@ -150,8 +150,9 @@ function StatusBadge({ tahap = 0, status }) {
 
 // ── Kesimpulan badge ──────────────────────────────────────────────────────────
 const KESIMPULAN_STYLE = {
-  "Baik":       "bg-emerald-100 text-emerald-700",
-  "Tidak Baik": "bg-red-100    text-red-700",
+  "Dubia":         "bg-amber-100   text-amber-700",
+  "Bonam / Sanam": "bg-emerald-100 text-emerald-700",
+  "Malam":         "bg-red-100     text-red-700",
 };
 
 function KesimpulanBadge({ penilaian }) {
@@ -183,9 +184,6 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
     ? new Date(row.Tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
     : "-";
 
-  const jamOP = row.Jam_OP
-    ? (row.JamSelesai_OP ? `${row.Jam_OP} – ${row.JamSelesai_OP}` : row.Jam_OP)
-    : null;
   const durasi = fmtDurasi(row.Durasi);
 
   return (
@@ -218,16 +216,12 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
       <div className="flex items-center justify-between pt-1 border-t border-gray-50">
         <div className="flex flex-col gap-0.5">
           <span className="text-[11px] text-gray-400">{tanggal}</span>
-          {(jamOP || durasi) && (
+          {durasi && (
             <span className="flex items-center gap-1 text-[11px] text-gray-500">
               <Timer className="w-3 h-3 shrink-0 text-[#2d6a4f]" />
-              {jamOP && <span className="font-medium text-gray-700">{jamOP}</span>}
-              {jamOP && durasi && <span className="text-gray-300">·</span>}
-              {durasi && (
-                <span>
-                  Durasi Operasi: <strong className="text-[#2d6a4f]">{durasi}</strong>
-                </span>
-              )}
+              <span>
+                Durasi Operasi: <strong className="text-[#2d6a4f]">{durasi}</strong>
+              </span>
             </span>
           )}
         </div>
@@ -302,7 +296,7 @@ export default function HomePage() {
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
-  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanBaik: 0, kesimpulanTidakBaik: 0 });
+  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanDubia: 0, kesimpulanBonamSanam: 0, kesimpulanMalam: 0 });
   const [loading,         setLoading]         = useState(true);
   const [refreshing,      setRefreshing]      = useState(false);
   const [showFilters,     setShowFilters]     = useState(false);
@@ -353,11 +347,12 @@ export default function HomePage() {
       const res = await getStats(filterParams);
       const d   = res.data || {};
       setStats({
-        total:               d.total                  || 0,
-        selesai:             d.selesai                || 0,
-        inProgress:          d.in_progress            || 0,
-        kesimpulanBaik:      d.kesimpulan_baik        || 0,
-        kesimpulanTidakBaik: d.kesimpulan_tidak_baik  || 0,
+        total:                d.total                    || 0,
+        selesai:              d.selesai                  || 0,
+        inProgress:           d.in_progress              || 0,
+        kesimpulanDubia:      d.kesimpulan_dubia         || 0,
+        kesimpulanBonamSanam: d.kesimpulan_bonam_sanam   || 0,
+        kesimpulanMalam:      d.kesimpulan_malam         || 0,
       });
     } catch {
       // silent
@@ -448,12 +443,13 @@ export default function HomePage() {
       </div>
 
       {/* ── Stat cards (klikable jadi filter, mengikuti filter aktif) ──────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard label="Total Penilaian"  value={stats.total}               color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter}              onClick={resetFilters} />
-        <StatCard label="Selesai"          value={stats.selesai}             color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2   className="w-4 h-4 text-emerald-500" />} active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
-        <StatCard label="Sedang Berjalan"  value={stats.inProgress}          color="bg-amber-50 border-amber-100"     icon={<Clock          className="w-4 h-4 text-amber-500"   />} active={statusFilter === "draft"}                      onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setPenilaianFilter(""); setActiveSearch(""); setSearchInput(""); }} />
-        <StatCard label="Kesimpulan Baik"  value={stats.kesimpulanBaik}      color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Baik"}                    onClick={() => { setPenilaianFilter((p) => p === "Baik" ? "" : "Baik"); setStatusFilter(""); }} />
-        <StatCard label="Tidak Baik"       value={stats.kesimpulanTidakBaik} color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Tidak Baik"}              onClick={() => { setPenilaianFilter((p) => p === "Tidak Baik" ? "" : "Tidak Baik"); setStatusFilter(""); }} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Total Penilaian"  value={stats.total}                color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter}              onClick={resetFilters} />
+        <StatCard label="Selesai"          value={stats.selesai}              color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2   className="w-4 h-4 text-emerald-500" />} active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
+        <StatCard label="Sedang Berjalan"  value={stats.inProgress}           color="bg-amber-50 border-amber-100"     icon={<Clock          className="w-4 h-4 text-amber-500"   />} active={statusFilter === "draft"}                      onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setPenilaianFilter(""); setActiveSearch(""); setSearchInput(""); }} />
+        <StatCard label="Dubia"            value={stats.kesimpulanDubia}      color="bg-amber-50 border-amber-100"     icon={<ThumbsUp       className="w-4 h-4 text-amber-500"   />} active={penilaianFilter === "Dubia"}                   onClick={() => { setPenilaianFilter((p) => p === "Dubia" ? "" : "Dubia"); setStatusFilter(""); }} />
+        <StatCard label="Bonam / Sanam"    value={stats.kesimpulanBonamSanam} color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Bonam / Sanam"}           onClick={() => { setPenilaianFilter((p) => p === "Bonam / Sanam" ? "" : "Bonam / Sanam"); setStatusFilter(""); }} />
+        <StatCard label="Malam"            value={stats.kesimpulanMalam}      color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Malam"}                   onClick={() => { setPenilaianFilter((p) => p === "Malam" ? "" : "Malam"); setStatusFilter(""); }} />
       </div>
 
       {/* ── Cards section ────────────────────────────────────────────────── */}
@@ -550,8 +546,9 @@ export default function HomePage() {
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
                 >
                   <option value="">— Semua Penilaian —</option>
-                  <option value="Baik">Baik</option>
-                  <option value="Tidak Baik">Tidak Baik</option>
+                  <option value="Dubia">Dubia</option>
+                  <option value="Bonam / Sanam">Bonam / Sanam</option>
+                  <option value="Malam">Malam</option>
                 </select>
               </div>
 

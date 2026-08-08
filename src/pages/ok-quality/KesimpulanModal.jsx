@@ -3,11 +3,16 @@ import { X, ClipboardCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { getKesimpulan, createKesimpulan, updateKesimpulan } from "../../services/ok_quality.service";
 import Swal from "sweetalert2";
 
-const PENILAIAN_OPTIONS = ["Baik", "Tidak Baik"];
+const PENILAIAN_OPTIONS = [
+  { value: "Malam",         desc: "Buruk" },
+  { value: "Dubia",         desc: "Ragu-ragu / Tidak Tentu" },
+  { value: "Bonam / Sanam", desc: "Baik / Sembuh" },
+];
 
 const PENILAIAN_STYLE = {
-  "Baik":      "bg-emerald-100 text-emerald-700 border-emerald-300",
-  "Tidak Baik": "bg-red-100    text-red-700    border-red-300",
+  "Dubia":         "bg-amber-100   text-amber-700   border-amber-300",
+  "Bonam / Sanam": "bg-emerald-100 text-emerald-700 border-emerald-300",
+  "Malam":         "bg-red-100     text-red-700     border-red-300",
 };
 
 export default function KesimpulanModal({ penilaianId, namaPassien, noReg, onClose, onSaved }) {
@@ -91,18 +96,21 @@ export default function KesimpulanModal({ penilaianId, namaPassien, noReg, onClo
                 Penilaian <span className="text-red-400">*</span>
               </label>
               <div className="flex gap-2">
-                {PENILAIAN_OPTIONS.map((opt) => (
+                {PENILAIAN_OPTIONS.map(({ value, desc }) => (
                   <button
-                    key={opt}
+                    key={value}
                     type="button"
-                    onClick={() => set("Penilaian", opt)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all
-                      ${form.Penilaian === opt
-                        ? `${PENILAIAN_STYLE[opt]} scale-[1.03] shadow-sm`
+                    onClick={() => set("Penilaian", value)}
+                    className={`flex-1 py-2.5 px-1.5 rounded-xl text-center border-2 transition-all
+                      ${form.Penilaian === value
+                        ? `${PENILAIAN_STYLE[value]} scale-[1.03] shadow-sm`
                         : "bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300"}`}
                   >
-                    {form.Penilaian === opt && <CheckCircle2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
-                    {opt}
+                    <span className="block text-sm font-bold">
+                      {form.Penilaian === value && <CheckCircle2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
+                      {value}
+                    </span>
+                    <span className="block text-[10px] font-medium opacity-80 mt-0.5">{desc}</span>
                   </button>
                 ))}
               </div>

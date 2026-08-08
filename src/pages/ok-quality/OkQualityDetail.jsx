@@ -1,13 +1,37 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Pencil, Loader2, CheckCircle2, Clock,
-  AlertCircle, User, Calendar, Stethoscope, Activity,
-  Syringe, HeartPulse, BedDouble, ArrowRight,
-  ClipboardCheck, ThumbsUp, ThumbsDown, UserCheck,
-  Timer, MapPin, ImageOff, X, Search,
+  ArrowLeft,
+  Pencil,
+  Loader2,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  User,
+  Calendar,
+  Stethoscope,
+  Activity,
+  Syringe,
+  HeartPulse,
+  BedDouble,
+  ArrowRight,
+  ClipboardCheck,
+  ThumbsUp,
+  ThumbsDown,
+  UserCheck,
+  Timer,
+  MapPin,
+  ImageOff,
+  X,
+  Search,
+  Users,
 } from "lucide-react";
-import { getById, getKesimpulan } from "../../services/ok_quality.service";
+import {
+  getById,
+  getKesimpulan,
+  getTimMedis,
+  getRiwayat,
+} from "../../services/ok_quality.service";
 import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { useAuth } from "../../context/AuthContext";
 import KesimpulanModal from "./KesimpulanModal";
@@ -207,28 +231,98 @@ function VitalsPanel({ td, tdper, hr, suhu, rr, label, color, showRR }) {
   );
 }
 
+// ── Tim medis chip/group ──────────────────────────────────────────────────────
+function PersonChip({ nama, kode }) {
+  return (
+    <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
+      <div className="w-8 h-8 shrink-0 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-gray-400">
+        <User className="w-4 h-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-gray-800 truncate">
+          {nama || "—"}
+        </p>
+        {nama && kode && (
+          <p className="text-[11px] text-gray-400">Kode: {kode}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimMedisGroup({ title, icon: Icon, color, people }) {
+  if (!people?.length) return null;
+  return (
+    <div>
+      <p
+        className={`text-[11px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5 ${color}`}
+      >
+        <Icon className="w-3.5 h-3.5" /> {title}
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {people.map((p, i) => (
+          <PersonChip key={`${title}-${i}`} nama={p.nama} kode={p.kode} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Kesimpulan card ───────────────────────────────────────────────────────────
 const PENILAIAN_CFG = {
-  "Baik":       { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700", icon: ThumbsUp,   iconColor: "text-emerald-500" },
-  "Tidak Baik": { bg: "bg-red-50",     border: "border-red-200",     badge: "bg-red-100 text-red-700",         icon: ThumbsDown, iconColor: "text-red-500"     },
+  Dubia: {
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    badge: "bg-amber-100 text-amber-700",
+    icon: ThumbsUp,
+    iconColor: "text-amber-500",
+  },
+  "Bonam / Sanam": {
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    badge: "bg-emerald-100 text-emerald-700",
+    icon: ThumbsUp,
+    iconColor: "text-emerald-500",
+  },
+  Malam: {
+    bg: "bg-red-50",
+    border: "border-red-200",
+    badge: "bg-red-100 text-red-700",
+    icon: ThumbsDown,
+    iconColor: "text-red-500",
+  },
 };
 
 function KesimpulanCard({ k }) {
-  const cfg  = PENILAIAN_CFG[k.Penilaian] ?? PENILAIAN_CFG["Tidak Baik"];
+  const cfg = PENILAIAN_CFG[k.Penilaian] ?? PENILAIAN_CFG["Dubia"];
   const Icon = cfg.icon;
-  const tgl  = k.Tgl_Input
-    ? new Date(k.Tgl_Input).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  const tgl = k.Tgl_Input
+    ? new Date(k.Tgl_Input).toLocaleString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : null;
 
   return (
-    <div className={`rounded-2xl border ${cfg.border} ${cfg.bg} overflow-hidden`}>
+    <div
+      className={`rounded-2xl border ${cfg.border} ${cfg.bg} overflow-hidden`}
+    >
       {/* Header */}
       <div className="flex items-center gap-2.5 px-5 py-4 border-b border-inherit">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-white/70 ${cfg.iconColor}`}>
+        <div
+          className={`w-8 h-8 rounded-xl flex items-center justify-center bg-white/70 ${cfg.iconColor}`}
+        >
           <ClipboardCheck className="w-4 h-4" />
         </div>
-        <h3 className="text-sm font-bold text-gray-700 flex-1">Kesimpulan Dokter</h3>
-        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}>
+        <h3 className="text-sm font-bold text-gray-700 flex-1">
+          Kesimpulan Dokter
+        </h3>
+        <span
+          className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${cfg.badge}`}
+        >
           <Icon className="w-3.5 h-3.5" />
           {k.Penilaian}
         </span>
@@ -238,14 +332,22 @@ function KesimpulanCard({ k }) {
       <div className="px-5 py-4 space-y-3">
         {k.Catatan && (
           <div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Catatan</p>
-            <p className="text-sm text-gray-800 whitespace-pre-wrap">{k.Catatan}</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+              Catatan
+            </p>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap">
+              {k.Catatan}
+            </p>
           </div>
         )}
         {k.Rekomendasi && (
           <div>
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Rekomendasi</p>
-            <p className="text-sm text-gray-800 whitespace-pre-wrap">{k.Rekomendasi}</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+              Rekomendasi
+            </p>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap">
+              {k.Rekomendasi}
+            </p>
           </div>
         )}
         <div className="flex items-center gap-1.5 pt-1 text-xs text-gray-400 border-t border-inherit">
@@ -270,7 +372,7 @@ const fmtDate = (d) =>
 const fmtDurasi = (menit) => {
   const m = parseFloat(menit);
   if (!m || isNaN(m)) return null;
-  const jam  = Math.floor(m / 60);
+  const jam = Math.floor(m / 60);
   const sisa = Math.round(m % 60);
   if (jam === 0) return `${sisa} mnt`;
   if (sisa === 0) return `${jam} jam`;
@@ -291,17 +393,21 @@ const fmtDateTime = (d) =>
 // MAIN
 // ══════════════════════════════════════════════════════════════════════════════
 export default function OkQualityDetail() {
-  const { id }    = useParams();
-  const navigate  = useNavigate();
+  const { id } = useParams();
+  const navigate = useNavigate();
   const { canKesimpulan } = useAuth();
-  const [data,       setData]       = useState(null);
+  const [data, setData] = useState(null);
   const [kesimpulan, setKesimpulan] = useState(null);
-  const [penandaan,  setPenandaan]  = useState(null);
-  const [loading,    setLoading]    = useState(true);
+  const [penandaan, setPenandaan] = useState(null);
+  const [timMedis, setTimMedis] = useState(null);
+  const [riwayat, setRiwayat] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showKesimpulanModal, setShowKesimpulanModal] = useState(false);
-  const [photoModalOpen,      setPhotoModalOpen]      = useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [timMedisModalOpen, setTimMedisModalOpen] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([getById(id), getKesimpulan(id)])
       .then(([detailRes, kesimpulanRes]) => {
         const d = detailRes.data;
@@ -312,10 +418,26 @@ export default function OkQualityDetail() {
           getPenandaan(d.No_Reg)
             .then((r) => setPenandaan(r.data || null))
             .catch(() => {});
+          // Riwayat operasi lain dalam No_Reg yang sama — dipakai untuk tab
+          // "Operasi ke-1 / ke-2 / ..." di atas halaman
+          getRiwayat(d.No_Reg)
+            .then((r) => setRiwayat(r.data || []))
+            .catch(() => {});
+        }
+        // Tim medis (anastesi, dokter operator, perawat) — butuh No_Jadwal
+        if (d?.No_Jadwal) {
+          getTimMedis(d.No_Jadwal)
+            .then((r) => setTimMedis(r.data || null))
+            .catch(() => {});
         }
       })
       .catch(() => {
-        Swal.fire({ icon: "error", title: "Gagal memuat detail", timer: 2000, showConfirmButton: false });
+        Swal.fire({
+          icon: "error",
+          title: "Gagal memuat detail",
+          timer: 2000,
+          showConfirmButton: false,
+        });
         navigate("/ok-quality");
       })
       .finally(() => setLoading(false));
@@ -331,6 +453,14 @@ export default function OkQualityDetail() {
 
   // Durasi operasi dari kolom Durasi (JADWAL_OPERASI)
   const durasiOperasiStr = fmtDurasi(data.Durasi);
+
+  const hasTimMedis =
+    !!timMedis &&
+    (timMedis.anastesi?.length > 0 ||
+      timMedis.penataAnastesi?.length > 0 ||
+      timMedis.dokterOperasi?.length > 0 ||
+      timMedis.perawatSirkuler?.length > 0 ||
+      timMedis.asistenOperator?.length > 0);
 
   const hasGCSBefore =
     data.GCS_Before_E || data.GCS_Before_M || data.GCS_Before_V;
@@ -360,6 +490,16 @@ export default function OkQualityDetail() {
           Kembali
         </button>
         <div className="flex items-center gap-2">
+          {/* Tombol Tim Medis — anastesi, dokter operator, perawat */}
+          {hasTimMedis && (
+            <button
+              onClick={() => setTimMedisModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-semibold hover:bg-indigo-100 transition-colors"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Tim Medis
+            </button>
+          )}
           {/* Tombol Kesimpulan — hanya dokter/admin, hanya saat selesai */}
           {canKesimpulan && data.Status === "selesai" && (
             <button
@@ -379,6 +519,65 @@ export default function OkQualityDetail() {
           </button>
         </div>
       </div>
+
+      {/* ── TAB OPERASI KE-N — pindah antar operasi dalam 1 No_Reg ──────────── */}
+      {riwayat.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          {riwayat.map((r, idx) => {
+            const belumDinilai = r.Id == null;
+            const active = !belumDinilai && String(r.Id) === String(id);
+            return (
+              <button
+                key={r.No_Jadwal || `${idx}`}
+                onClick={() => {
+                  if (active) return;
+                  if (belumDinilai) {
+                    // Jadwal ini belum punya penilaian → langsung masuk step penilaian
+                    navigate("/ok-quality/form", {
+                      state: {
+                        jadwal: {
+                          No_Jadwal: r.No_Jadwal,
+                          No_Reg: data.No_Reg,
+                          No_MR: data.No_MR,
+                          Nama_Pasien: data.Nama_Pasien,
+                          Tanggal: r.Tanggal,
+                          Tindakan: r.Tindakan,
+                          Kamar: r.Kamar,
+                        },
+                      },
+                    });
+                    return;
+                  }
+                  navigate(`/ok-quality/${r.Id}`);
+                }}
+                className={`shrink-0 flex flex-col items-start gap-0.5 px-4 py-2 rounded-xl border text-left transition-colors
+                  ${
+                    active
+                      ? "bg-[#2d6a4f] border-[#2d6a4f] text-white shadow"
+                      : belumDinilai
+                        ? "bg-gray-50 border-dashed border-gray-200 text-gray-400 hover:border-amber-300 hover:text-amber-600 cursor-pointer"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-[#2d6a4f]/40"
+                  }`}
+              >
+                <span className="text-xs font-bold whitespace-nowrap">
+                  Operasi ke-{idx + 1}
+                </span>
+                <span
+                  className={`text-[10px] whitespace-nowrap ${active ? "text-white/80" : "text-gray-400"}`}
+                >
+                  {fmtDate(r.Tanggal) ?? "—"}
+                  {r.No_Jadwal ? ` · ${r.No_Jadwal}` : ""}
+                </span>
+                {belumDinilai && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-500 mt-0.5">
+                    Belum dinilai
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Hero card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
@@ -430,8 +629,12 @@ export default function OkQualityDetail() {
               <BedDouble className="w-4 h-4 text-[#2d6a4f]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Kamar Operasi</p>
-              <p className="text-sm font-bold text-gray-800 truncate">{data.Kamar || "—"}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                Kamar Operasi
+              </p>
+              <p className="text-sm font-bold text-gray-800 truncate">
+                {data.Kamar || "—"}
+              </p>
             </div>
           </div>
 
@@ -441,7 +644,9 @@ export default function OkQualityDetail() {
               <Stethoscope className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">DPJP</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                DPJP
+              </p>
               <p className="text-sm font-bold text-gray-800 truncate">
                 {data.DPJP_Nama || data.DPJP || "—"}
               </p>
@@ -457,8 +662,12 @@ export default function OkQualityDetail() {
               <User className="w-4 h-4 text-sky-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Asal Pasien</p>
-              <p className="text-sm font-bold text-gray-800 truncate">{data.Asal_Pasien || "—"}</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                Asal Pasien
+              </p>
+              <p className="text-sm font-bold text-gray-800 truncate">
+                {data.Asal_Pasien || "—"}
+              </p>
             </div>
           </div>
         </div>
@@ -467,26 +676,34 @@ export default function OkQualityDetail() {
         {(data.Jam_OP || data.JamSelesai_OP || durasiOperasiStr) && (
           <div className="flex flex-wrap gap-3 mb-4">
             {/* Jam operasi */}
-            {(data.Jam_OP || data.JamSelesai_OP) && (
+            {/* {(data.Jam_OP || data.JamSelesai_OP) && (
               <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
                 <Clock className="w-4 h-4 text-[#2d6a4f] shrink-0" />
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Jam Operasi</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">
+                    Jam Operasi
+                  </p>
                   <p className="text-sm font-bold text-gray-800 leading-tight">
                     {data.Jam_OP ?? "—"}
-                    {data.JamSelesai_OP && <span className="text-gray-400 font-normal mx-1">–</span>}
+                    {data.JamSelesai_OP && (
+                      <span className="text-gray-400 font-normal mx-1">–</span>
+                    )}
                     {data.JamSelesai_OP ?? ""}
                   </p>
                 </div>
               </div>
-            )}
+            )} */}
             {/* Durasi operasi (kolom Durasi) */}
             {durasiOperasiStr && (
               <div className="flex items-center gap-2.5 bg-[#2d6a4f]/5 border border-[#2d6a4f]/15 rounded-xl px-4 py-2.5">
                 <Timer className="w-4 h-4 text-[#2d6a4f] shrink-0" />
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Durasi Operasi</p>
-                  <p className="text-sm font-bold text-[#2d6a4f] leading-tight">{durasiOperasiStr}</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">
+                    Durasi Operasi
+                  </p>
+                  <p className="text-sm font-bold text-[#2d6a4f] leading-tight">
+                    {durasiOperasiStr}
+                  </p>
                 </div>
               </div>
             )}
@@ -520,7 +737,9 @@ export default function OkQualityDetail() {
             <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-purple-50 text-purple-500">
               <MapPin className="w-4 h-4" />
             </div>
-            <h3 className="text-sm font-bold text-gray-700">Penandaan Lokasi Operasi</h3>
+            <h3 className="text-sm font-bold text-gray-700">
+              Penandaan Lokasi Operasi
+            </h3>
           </div>
           <div className="p-5 flex flex-col items-center gap-4">
             {/* Foto */}
@@ -549,7 +768,10 @@ export default function OkQualityDetail() {
                       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
                       onClick={() => setPhotoModalOpen(false)}
                     >
-                      <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="relative max-w-3xl w-full"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           onClick={() => setPhotoModalOpen(false)}
                           className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900"
@@ -559,7 +781,9 @@ export default function OkQualityDetail() {
                         <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
                           <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-purple-500" />
-                            <span className="text-sm font-semibold text-gray-700">Foto Penandaan Lokasi Operasi</span>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Foto Penandaan Lokasi Operasi
+                            </span>
                           </div>
                           <div className="p-4 flex items-center justify-center bg-gray-50">
                             <img
@@ -584,7 +808,9 @@ export default function OkQualityDetail() {
             {/* Prosedur */}
             {penandaan.Prosedur && (
               <div className="w-full max-w-sm text-center">
-                <p className="text-sm text-gray-700 leading-relaxed">{penandaan.Prosedur}</p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {penandaan.Prosedur}
+                </p>
               </div>
             )}
           </div>
@@ -599,7 +825,7 @@ export default function OkQualityDetail() {
               <Activity className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-bold text-gray-700">
-              Perbandingan GCS
+              Perbandingan Kondisi Umum
             </h3>
           </div>
           <div className="p-5">
@@ -729,16 +955,21 @@ export default function OkQualityDetail() {
                   {(data.DPJP_Nama || data.DPJP) && (
                     <InfoRow
                       label="DPJP"
-                      value={data.DPJP_Nama
-                        ? `${data.DPJP_Nama}${data.DPJP ? ` (${data.DPJP})` : ""}`
-                        : data.DPJP}
+                      value={
+                        data.DPJP_Nama
+                          ? `${data.DPJP_Nama}${data.DPJP ? ` (${data.DPJP})` : ""}`
+                          : data.DPJP
+                      }
                     />
                   )}
                   {data.Kamar && (
                     <InfoRow label="Kamar Operasi" value={data.Kamar} />
                   )}
                   <InfoRow label="Diagnosa" value={data.Diagnosa} />
-                  <InfoRow label="Tindakan" value={data.Tindakan || data.Tindakan_Jadwal} />
+                  <InfoRow
+                    label="Tindakan"
+                    value={data.Tindakan || data.Tindakan_Jadwal}
+                  />
                   <InfoRow
                     label="Penyakit Penyerta"
                     value={data.Penyakit_Penyerta}
@@ -814,7 +1045,7 @@ export default function OkQualityDetail() {
                 <BedDouble className="w-3.5 h-3.5" />
               </div>
               <span className="text-xs font-bold text-gray-700">
-                Kondisi Luka & Ruangan
+                Kondisi Luka
               </span>
               {!data.Kondisi_Luka_RR &&
                 !data.Kondisi_Luka_Ranap &&
@@ -881,6 +1112,66 @@ export default function OkQualityDetail() {
             navigate("/home");
           }}
         />
+      )}
+
+      {/* Modal Tim Medis */}
+      {timMedisModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setTimMedisModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-lg max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100 shrink-0">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-50 text-indigo-500">
+                <Users className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-gray-700 flex-1">
+                Tim Medis
+              </h3>
+              <button
+                onClick={() => setTimMedisModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <TimMedisGroup
+                title="Dokter Anastesi"
+                icon={Syringe}
+                color="text-violet-500"
+                people={timMedis?.anastesi}
+              />
+              <TimMedisGroup
+                title="Penata Anastesi"
+                icon={UserCheck}
+                color="text-violet-400"
+                people={timMedis?.penataAnastesi}
+              />
+              <TimMedisGroup
+                title="Dokter Operator"
+                icon={Stethoscope}
+                color="text-emerald-600"
+                people={timMedis?.dokterOperasi}
+              />
+              <TimMedisGroup
+                title="Perawat Sirkuler"
+                icon={UserCheck}
+                color="text-sky-500"
+                people={timMedis?.perawatSirkuler}
+              />
+              <TimMedisGroup
+                title="Asisten Operator"
+                icon={UserCheck}
+                color="text-sky-400"
+                people={timMedis?.asistenOperator}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
