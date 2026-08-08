@@ -29,8 +29,9 @@ function StatusBadge({ tahap = 0, status }) {
 
 // ── Kesimpulan badge ──────────────────────────────────────────────────────────
 const KESIMPULAN_STYLE = {
-  "Baik":       "bg-emerald-100 text-emerald-700",
-  "Tidak Baik": "bg-red-100    text-red-700",
+  "Dubia":         "bg-amber-100   text-amber-700",
+  "Bonam / Sanam": "bg-emerald-100 text-emerald-700",
+  "Malam":         "bg-red-100     text-red-700",
 };
 
 function KesimpulanBadge({ penilaian }) {
@@ -216,8 +217,9 @@ export default function OkQualityList() {
           className="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
         >
           <option value="">— Semua Penilaian —</option>
-          <option value="Baik">Baik</option>
-          <option value="Tidak Baik">Tidak Baik</option>
+          <option value="Dubia">Dubia</option>
+          <option value="Bonam / Sanam">Bonam / Sanam</option>
+          <option value="Malam">Malam</option>
         </select>
       </div>
 
