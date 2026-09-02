@@ -229,7 +229,16 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
           <button onClick={() => onView(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" title="Lihat detail">
             <Eye className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onEdit(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f] transition-colors" title="Edit">
+          <button
+            onClick={() => onEdit(row.Id)}
+            disabled={!!row.Kesimpulan_Penilaian}
+            className={`p-1.5 rounded-lg transition-colors ${
+              row.Kesimpulan_Penilaian
+                ? "text-gray-200 cursor-not-allowed"
+                : "text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f]"
+            }`}
+            title={row.Kesimpulan_Penilaian ? "Sudah ada kesimpulan, tidak dapat diedit" : "Edit"}
+          >
             <Pencil className="w-3.5 h-3.5" />
           </button>
           {row.Status === "selesai" && canKesimpulan && (
