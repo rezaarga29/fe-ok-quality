@@ -512,7 +512,13 @@ export default function OkQualityDetail() {
           )}
           <button
             onClick={() => navigate(`/ok-quality/form/${id}`)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
+            disabled={!!kesimpulan}
+            title={kesimpulan ? "Penilaian sudah memiliki kesimpulan, tidak dapat diedit" : undefined}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors shadow ${
+              kesimpulan
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                : "bg-[#2d6a4f] text-white hover:bg-[#1b4332]"
+            }`}
           >
             <Pencil className="w-3.5 h-3.5" />
             Edit
@@ -1093,7 +1099,13 @@ export default function OkQualityDetail() {
         )}
         <button
           onClick={() => navigate(`/ok-quality/form/${id}`)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
+          disabled={!!kesimpulan}
+          title={kesimpulan ? "Penilaian sudah memiliki kesimpulan, tidak dapat diedit" : undefined}
+          className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow ${
+            kesimpulan
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+              : "bg-[#2d6a4f] text-white hover:bg-[#1b4332]"
+          }`}
         >
           <Pencil className="w-4 h-4" />
           Edit Penilaian

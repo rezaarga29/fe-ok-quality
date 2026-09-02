@@ -289,8 +289,13 @@ export default function OkQualityList() {
                           </button>
                           <button
                             onClick={() => navigate(`/ok-quality/form/${row.Id}`)}
-                            className="p-2 rounded-lg text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f] transition-colors"
-                            title="Edit"
+                            disabled={!!row.Kesimpulan_Penilaian}
+                            className={`p-2 rounded-lg transition-colors ${
+                              row.Kesimpulan_Penilaian
+                                ? "text-gray-200 cursor-not-allowed"
+                                : "text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f]"
+                            }`}
+                            title={row.Kesimpulan_Penilaian ? "Sudah ada kesimpulan, tidak dapat diedit" : "Edit"}
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -344,7 +349,13 @@ export default function OkQualityList() {
                       </button>
                       <button
                         onClick={() => navigate(`/ok-quality/form/${row.Id}`)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f] transition-colors"
+                        disabled={!!row.Kesimpulan_Penilaian}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          row.Kesimpulan_Penilaian
+                            ? "text-gray-200 cursor-not-allowed"
+                            : "text-gray-400 hover:bg-[#2d6a4f]/10 hover:text-[#2d6a4f]"
+                        }`}
+                        title={row.Kesimpulan_Penilaian ? "Sudah ada kesimpulan, tidak dapat diedit" : "Edit"}
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
