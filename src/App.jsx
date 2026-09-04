@@ -35,7 +35,11 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
-    loader: async () => {
+    loader: async ({ request }) => {
+      const url = new URL(request.url);
+      if (url.searchParams.get("error") === "forbidden") {
+        return redirect("/forbidden");
+      }
       const session = await checkSession();
       if (session) return redirect("/home");
       return null;
