@@ -296,13 +296,15 @@ const PENILAIAN_CFG = {
 function KesimpulanCard({ k }) {
   const cfg = PENILAIAN_CFG[k.Penilaian] ?? PENILAIAN_CFG["Dubia"];
   const Icon = cfg.icon;
-  const tgl = k.Tgl_Input
-    ? new Date(k.Tgl_Input).toLocaleString("id-ID", {
+  const tglInputUtc = toUtcDate(k.Tgl_Input);
+  const tgl = tglInputUtc
+    ? tglInputUtc.toLocaleString("id-ID", {
         day: "2-digit",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Asia/Jakarta",
       })
     : null;
 
@@ -360,14 +362,32 @@ function KesimpulanCard({ k }) {
   );
 }
 
-const fmtDate = (d) =>
-  d
-    ? new Date(d).toLocaleDateString("id-ID", {
+// Backend selalu menyimpan & mengirim waktu dalam UTC tanpa suffix
+// (mis. "2026-09-07 04:38:00.000"), karena SQL Server DATETIME tidak
+// menyimpan timezone offset. Tambahkan 'Z' di sini supaya JS men-parse
+// string tsb sebagai UTC, lalu format eksplisit ke WIB (Asia/Jakarta)
+// supaya tidak bergantung pada timezone OS/browser user.
+const toUtcDate = (d) => {
+  if (!d) return null;
+  const iso =
+    typeof d === "string" && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(d)
+      ? d.replace(" ", "T") + "Z"
+      : d;
+  const dt = new Date(iso);
+  return isNaN(dt.getTime()) ? null : dt;
+};
+
+const fmtDate = (d) => {
+  const dt = toUtcDate(d);
+  return dt
+    ? dt.toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",
+        timeZone: "Asia/Jakarta",
       })
     : null;
+};
 
 const fmtDurasi = (menit) => {
   const m = parseFloat(menit);
@@ -378,16 +398,20 @@ const fmtDurasi = (menit) => {
   if (sisa === 0) return `${jam} jam`;
   return `${jam} jam ${sisa} mnt`;
 };
-const fmtDateTime = (d) =>
-  d
-    ? new Date(d).toLocaleString("id-ID", {
+const fmtDateTime = (d) => {
+  const dt = toUtcDate(d);
+  const result = dt
+    ? dt.toLocaleString("id-ID", {
         day: "2-digit",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Asia/Jakarta",
       })
     : null;
+  return result;
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN
