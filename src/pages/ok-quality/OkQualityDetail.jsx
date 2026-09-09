@@ -106,6 +106,19 @@ function StatusBadge({ tahap = 0, status }) {
 }
 
 // ── Info row ──────────────────────────────────────────────────────────────────
+// Baris kecil "Diisi oleh: <nama> · <tanggal>" per tahap (Sebelum/Waktu/
+// Sesudah OP) — beda dari strip NamaUser/Tgl_Update global di header, ini
+// nunjukin siapa yang ngisi tahap tsb secara spesifik.
+function StageFilledBy({ namaUser, tgl }) {
+  if (!namaUser) return null;
+  return (
+    <p className="text-[11px] text-gray-400 pt-1 mt-1 border-t border-gray-50">
+      Diisi: <strong className="text-gray-500 font-semibold">{namaUser}</strong>
+      {tgl && ` · ${fmtDateTime(tgl)}`}
+    </p>
+  );
+}
+
 function InfoRow({ label, value, span = false }) {
   return (
     <div className={span ? "sm:col-span-2" : ""}>
@@ -1006,6 +1019,10 @@ export default function OkQualityDetail() {
                   />
                   <InfoRow label="Asal Pasien" value={data.Asal_Pasien} />
                   <InfoRow label="ASA Grade" value={data.ASA} />
+                  <StageFilledBy
+                    namaUser={data.NamaUser_Tahap1}
+                    tgl={data.Tgl_Tahap1}
+                  />
                 </div>
               )}
             </div>
@@ -1050,6 +1067,10 @@ export default function OkQualityDetail() {
                   <InfoRow
                     label="Join DPJP Intra OP"
                     value={data.Join_DPJP_Intra_Op}
+                  />
+                  <StageFilledBy
+                    namaUser={data.NamaUser_Tahap2}
+                    tgl={data.Tgl_Tahap2}
                   />
                 </div>
               )}
@@ -1103,6 +1124,10 @@ export default function OkQualityDetail() {
                     value={data.Kondisi_Luka_Ranap}
                   />
                   <InfoRow label="Ruangan" value={data.Ruangan} />
+                  <StageFilledBy
+                    namaUser={data.NamaUser_Tahap3}
+                    tgl={data.Tgl_Tahap3}
+                  />
                 </div>
               )}
             </div>
