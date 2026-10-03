@@ -213,17 +213,61 @@ function NoteBox({ label, value, hint }) {
   );
 }
 
-function Textarea({ autoFilled, ...props }) {
+function Textarea({ autoFilled, invalid, ...props }) {
   return (
     <textarea
       rows={3}
       {...props}
       className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] transition-colors resize-none ${
-        autoFilled
-          ? "border-emerald-300 bg-emerald-50/50"
-          : "border-gray-200 bg-white"
+        invalid
+          ? "border-red-400 bg-red-50/40"
+          : autoFilled
+            ? "border-emerald-300 bg-emerald-50/50"
+            : "border-gray-200 bg-white"
       }`}
     />
+  );
+}
+
+// ── Checkbox kotak Ya / Tidak (pilih salah satu, klik lagi untuk batal) ─────
+function YaTidakCheckbox({ value, onChange }) {
+  const opts = [
+    { val: "Ya", active: "border-red-400 bg-red-50 text-red-700", box: "bg-red-500 border-red-500" },
+    { val: "Tidak", active: "border-emerald-400 bg-emerald-50 text-emerald-700", box: "bg-emerald-600 border-emerald-600" },
+  ];
+  return (
+    <div className="flex gap-3">
+      {opts.map((o) => {
+        const checked = value === o.val;
+        return (
+          <label
+            key={o.val}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium cursor-pointer select-none transition-colors ${
+              checked ? o.active : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={checked}
+              onChange={() => onChange(checked ? "" : o.val)}
+            />
+            <span
+              className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                checked ? o.box : "border-gray-300 bg-white"
+              }`}
+            >
+              {checked && (
+                <svg viewBox="0 0 12 12" className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M2.5 6.5l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </span>
+            {o.val}
+          </label>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1239,6 +1283,7 @@ export default function OkQualityForm() {
     TTV_RR: "",
     Cara_Masuk: "",
     Asal_Pasien: "",
+    Komplikasi: "", // "Ya" / "Tidak"
     Penyakit_Penyerta: "",
     // Tahap 2
     Pendarahan: "",
@@ -1263,6 +1308,10 @@ export default function OkQualityForm() {
   const [filledFields, setFilledFields] = useState(new Set());
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Komplikasi = "Ya" → Penyakit Penyerta wajib diisi
+  const komplikasiInvalid =
+    form.Komplikasi === "Ya" && !String(form.Penyakit_Penyerta ?? "").trim();
 
   // Terapkan nilai dari modal referensi Monitoring Pasca Bedah ke form.
   // fields: object { formKey: value }. Field yang diisi di-highlight hijau
@@ -1724,6 +1773,15 @@ export default function OkQualityForm() {
       });
     }
 
+    if (step === 1 && komplikasiInvalid) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Penyakit Penyerta wajib diisi",
+        text: "Komplikasi dicentang \"Ya\", isi penyakit penyertanya terlebih dahulu.",
+        confirmButtonColor: "#2d6a4f",
+      });
+    }
+
     setSaving(true);
     try {
       // Gabungkan Cara_Masuk + Asal_Pasien → satu field Asal_Pasien
@@ -2137,12 +2195,33 @@ export default function OkQualityForm() {
               </Field>
             </div>
             <div className="sm:col-span-2">
-              <Field label="Penyakit Penyerta">
+              <Field label="Komplikasi">
+                <YaTidakCheckbox
+                  value={form.Komplikasi}
+                  onChange={(v) => set("Komplikasi", v)}
+                />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field
+                label="Penyakit Penyerta"
+                hint={form.Komplikasi === "Ya" ? "wajib" : undefined}
+              >
                 <Textarea
                   value={form.Penyakit_Penyerta}
                   onChange={(e) => set("Penyakit_Penyerta", e.target.value)}
-                  placeholder="Penyakit penyerta..."
+                  invalid={komplikasiInvalid}
+                  placeholder={
+                    form.Komplikasi === "Ya"
+                      ? "Wajib diisi karena ada komplikasi..."
+                      : "Penyakit penyerta..."
+                  }
                 />
+                {komplikasiInvalid && (
+                  <p className="text-[11px] text-red-500 mt-1">
+                    Penyakit penyerta wajib diisi jika Komplikasi = Ya
+                  </p>
+                )}
               </Field>
             </div>
           </Section>

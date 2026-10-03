@@ -1013,6 +1013,7 @@ export default function OkQualityDetail() {
                     label="Tindakan"
                     value={data.Tindakan || data.Tindakan_Jadwal}
                   />
+                  <InfoRow label="Komplikasi" value={data.Komplikasi} />
                   <InfoRow
                     label="Penyakit Penyerta"
                     value={data.Penyakit_Penyerta}
