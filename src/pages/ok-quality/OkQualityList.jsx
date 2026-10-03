@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck, ChevronLeft, ChevronRight, Route, Stethoscope, X, StickyNote } from "lucide-react";
 import { getAll } from "../../services/ok_quality.service";
 import KesimpulanModal from "./KesimpulanModal";
+import PerjalananPasienModal from "./PerjalananPasienModal";
+import NotesModal from "./NotesModal";
+import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, StatusKeluarSelect, StatusKeluarBadge, NotePreview, NotesButton } from "../../components/OkqShared";
 import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 
@@ -140,13 +143,18 @@ function Pagination({ pagination, onPage }) {
 
 export default function OkQualityList() {
   const navigate = useNavigate();
-  const { canKesimpulan } = useAuth();
+  const { canKesimpulan, canNotes } = useAuth();
   const [data, setData]                       = useState([]);
   const [kesimpulanModal, setKesimpulanModal] = useState(null);
   const [loading, setLoading]                 = useState(true);
   const [search, setSearch]                   = useState("");
   const [searchInput, setSearchInput]         = useState("");
   const [penilaianFilter, setPenilaianFilter] = useState("");
+  const [dpjpFilter, setDpjpFilter]           = useState(null); // { value, label }
+  const [jenisRawatFilter, setJenisRawatFilter] = useState("");
+  const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
+  const [kodeKeluarFilter, setKodeKeluarFilter] = useState("");
+  const [notesModal, setNotesModal]           = useState(null); // { noJadwal, noReg, nama }
   const [pagination, setPagination]           = useState({ page: 1, totalPages: 1, total: 0 });
 
   const fetchData = useCallback(async (page = 1) => {
@@ -156,6 +164,9 @@ export default function OkQualityList() {
         page, limit: 15,
         ...(search          && { search }),
         ...(penilaianFilter && { penilaian: penilaianFilter }),
+        ...(dpjpFilter?.value && { dpjp: dpjpFilter.value }),
+        ...(jenisRawatFilter && { jenis_rawat: jenisRawatFilter }),
+        ...(kodeKeluarFilter && { kode_keluar: kodeKeluarFilter }),
       });
       setData(res.data || []);
       setPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
@@ -164,7 +175,7 @@ export default function OkQualityList() {
     } finally {
       setLoading(false);
     }
-  }, [search, penilaianFilter]);
+  }, [search, penilaianFilter, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
@@ -217,10 +228,45 @@ export default function OkQualityList() {
           className="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
         >
           <option value="">— Semua Penilaian —</option>
-          <option value="Dubia">Dubia</option>
-          <option value="Bonam / Sanam">Bonam / Sanam</option>
-          <option value="Malam">Malam</option>
+          <option value="Bonam / Sanam">Bonam / Sanam — prognosis baik</option>
+          <option value="Dubia">Dubia — prognosis meragukan</option>
+          <option value="Malam">Malam — prognosis buruk</option>
         </select>
+
+        {/* Filter Jenis Rawat */}
+        <div className="w-52">
+          <JenisRawatSelect
+            value={jenisRawatFilter}
+            onChange={setJenisRawatFilter}
+            className="py-2.5"
+          />
+        </div>
+
+        {/* Filter Status Keluar */}
+        <div className="w-60">
+          <StatusKeluarSelect
+            value={kodeKeluarFilter}
+            onChange={setKodeKeluarFilter}
+            className="py-2.5"
+          />
+        </div>
+
+        {/* Filter DPJP */}
+        <div className="w-full sm:w-72">
+          <DpjpSelect value={dpjpFilter} onChange={setDpjpFilter} />
+        </div>
+
+        {(search || penilaianFilter || dpjpFilter || jenisRawatFilter || kodeKeluarFilter) && (
+          <button
+            onClick={() => {
+              setSearch(""); setSearchInput("");
+              setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter("");
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 hover:text-red-500 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" /> Reset
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -264,6 +310,20 @@ export default function OkQualityList() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800 text-sm">{row.Nama_Pasien ?? "-"}</p>
                         <p className="text-xs text-gray-400">{row.No_MR}</p>
+                        {(row.DPJP_Nama || row.DPJP) && (
+                          <p className="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
+                            <Stethoscope className="w-3 h-3 shrink-0 text-[#2d6a4f]" />
+                            {row.DPJP_Nama || row.DPJP}
+                          </p>
+                        )}
+                        {canNotes && (
+                          <NotePreview
+                            text={row.Last_Note}
+                            count={row.Notes_Count}
+                            className="mt-1.5 max-w-xs"
+                            onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                          />
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {row.Tanggal ? new Date(row.Tanggal).toLocaleDateString("id-ID") : "-"}
@@ -273,13 +333,27 @@ export default function OkQualityList() {
                         <p className="text-[10px] text-gray-400 mt-1">Tahap {row.Tahap_Selesai ?? 0}/3</p>
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+                          <JenisRawatBadge jenis={row.Jenis_Rawat} />
+                          <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <KesimpulanBadge penilaian={row.Kesimpulan_Penilaian} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {canNotes && (
+                            <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
+                          )}
+                          <button
+                            onClick={() => setPerjalananModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                            className="p-2 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+                            title="Perjalanan perpindahan pasien"
+                          >
+                            <Route className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => navigate(`/ok-quality/${row.Id}`)}
                             className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -327,10 +401,28 @@ export default function OkQualityList() {
                       {row.No_Jadwal && (
                         <p className="text-[10px] text-emerald-700 font-mono mt-0.5">Jadwal: {row.No_Jadwal}</p>
                       )}
+                      {(row.DPJP_Nama || row.DPJP) && (
+                        <p className="flex items-center gap-1 text-[10px] text-gray-500 mt-0.5">
+                          <Stethoscope className="w-3 h-3 shrink-0 text-[#2d6a4f]" />
+                          {row.DPJP_Nama || row.DPJP}
+                        </p>
+                      )}
                     </div>
-                    <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+                      <JenisRawatBadge jenis={row.Jenis_Rawat} />
+                      <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                    </div>
                   </div>
                   <ProgressBar tahap={row.Tahap_Selesai} />
+                  {canNotes && (
+                    <NotePreview
+                      text={row.Last_Note}
+                      count={row.Notes_Count}
+                      className="mt-2"
+                      onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                    />
+                  )}
                   {row.Kesimpulan_Penilaian && (
                     <div className="mt-2">
                       <KesimpulanBadge penilaian={row.Kesimpulan_Penilaian} />
@@ -341,6 +433,16 @@ export default function OkQualityList() {
                       {row.Tanggal ? new Date(row.Tanggal).toLocaleDateString("id-ID") : "-"} · Tahap {row.Tahap_Selesai ?? 0}/3
                     </p>
                     <div className="flex gap-1">
+                      {canNotes && (
+                        <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
+                      )}
+                      <button
+                        onClick={() => setPerjalananModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+                        title="Perjalanan perpindahan pasien"
+                      >
+                        <Route className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => navigate(`/ok-quality/${row.Id}`)}
                         className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
@@ -376,6 +478,26 @@ export default function OkQualityList() {
           </>
         )}
       </div>
+
+      {/* Perjalanan Perpindahan Pasien Modal */}
+      {perjalananModal && (
+        <PerjalananPasienModal
+          noReg={perjalananModal.noReg}
+          namaPasien={perjalananModal.nama}
+          onClose={() => setPerjalananModal(null)}
+        />
+      )}
+
+      {/* Notes Modal (role ok-quality-notes) */}
+      {notesModal && (
+        <NotesModal
+          noJadwal={notesModal.noJadwal}
+          noReg={notesModal.noReg}
+          namaPasien={notesModal.nama}
+          onClose={() => setNotesModal(null)}
+          onSaved={() => fetchData(pagination.page)}
+        />
+      )}
 
       {/* Kesimpulan Modal */}
       {kesimpulanModal && (

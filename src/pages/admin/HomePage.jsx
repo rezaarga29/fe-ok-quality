@@ -4,11 +4,16 @@ import {
   Sun, Sunrise, Moon, Eye, Pencil, Plus, RefreshCw,
   ClipboardList, CheckCircle2, Clock, AlertCircle, Loader2,
   Search, Filter, X, CalendarDays, ClipboardCheck, Timer,
-  ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown,
+  ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, Stethoscope, BedDouble, Footprints, Route, StickyNote, HeartCrack, CircleHelp,
 } from "lucide-react";
+import Select from "react-select";
 import { useAuth } from "../../context/AuthContext";
 import { getAll, getStats } from "../../services/ok_quality.service";
+import { getDokterList } from "../../services/dokter.service";
 import KesimpulanModal from "../ok-quality/KesimpulanModal";
+import PerjalananPasienModal from "../ok-quality/PerjalananPasienModal";
+import NotesModal from "../ok-quality/NotesModal";
+import { StatusKeluarBadge, StatusKeluarSelect, useStatusKeluarOptions, NotePreview, NotesButton } from "../../components/OkqShared";
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 function Pagination({ pagination, limit = 20, onPage }) {
@@ -148,6 +153,25 @@ function StatusBadge({ tahap = 0, status }) {
   );
 }
 
+// ── Jenis rawat badge (dari PENDAFTARAN.Medis) ───────────────────────────────
+const JENIS_RAWAT_OPTIONS = [
+  { value: "RAWAT INAP", label: "Rawat Inap" },
+  { value: "ODC",        label: "ODC (Rawat Jalan)" },
+];
+
+function JenisRawatBadge({ jenis }) {
+  if (!jenis) return null;
+  const style = jenis === "RAWAT INAP"
+    ? "bg-indigo-100 text-indigo-700"
+    : "bg-sky-100 text-sky-700";
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${style}`}>
+      {jenis === "RAWAT INAP" ? <BedDouble className="w-3 h-3" /> : <Footprints className="w-3 h-3" />}
+      {jenis}
+    </span>
+  );
+}
+
 // ── Kesimpulan badge ──────────────────────────────────────────────────────────
 const KESIMPULAN_STYLE = {
   "Dubia":         "bg-amber-100   text-amber-700",
@@ -177,7 +201,7 @@ function fmtDurasi(menit) {
 }
 
 // ── Patient card ──────────────────────────────────────────────────────────────
-function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
+function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onNotes, canKesimpulan, canNotes }) {
   const nama     = row.Nama_Pasien ?? "-";
   const initials = nama.split(" ").slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
   const tanggal  = row.Tanggal
@@ -198,11 +222,26 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
           {row.No_Jadwal && (
             <p className="text-[10px] text-emerald-700 font-mono mt-0.5">Jadwal: {row.No_Jadwal}</p>
           )}
+          {(row.DPJP_Nama || row.DPJP) && (
+            <p className="flex items-center gap-1 text-[10px] text-gray-500 mt-0.5 truncate" title="DPJP">
+              <Stethoscope className="w-3 h-3 shrink-0 text-[#2d6a4f]" />
+              <span className="truncate">{row.DPJP_Nama || row.DPJP}</span>
+            </p>
+          )}
         </div>
-        <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
+          <JenisRawatBadge jenis={row.Jenis_Rawat} />
+          <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+        </div>
       </div>
 
       <JourneySteps tahap={row.Tahap_Selesai} status={row.Status} />
+
+      {/* Preview notes terakhir — hanya untuk user yang punya akses notes */}
+      {canNotes && (
+        <NotePreview text={row.Last_Note} count={row.Notes_Count} onClick={() => onNotes(row)} />
+      )}
 
       {/* Kesimpulan badge — hanya tampil jika sudah ada kesimpulan */}
       {row.Kesimpulan_Penilaian && (
@@ -226,6 +265,16 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
           )}
         </div>
         <div className="flex gap-1">
+          {canNotes && (
+            <NotesButton count={row.Notes_Count} size="sm" onClick={() => onNotes(row)} />
+          )}
+          <button
+            onClick={() => onPerjalanan(row)}
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+            title="Perjalanan perpindahan pasien"
+          >
+            <Route className="w-3.5 h-3.5" />
+          </button>
           <button onClick={() => onView(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" title="Lihat detail">
             <Eye className="w-3.5 h-3.5" />
           </button>
@@ -257,7 +306,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, canKesimpulan }) {
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, color, icon, active, onClick }) {
+function StatCard({ label, hint, value, color, icon, active, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -271,6 +320,7 @@ function StatCard({ label, value, color, icon, active, onClick }) {
       <div>
         <p className="text-2xl font-extrabold text-gray-800 leading-none">{value}</p>
         <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+        {hint && <p className="text-[10px] text-gray-400 leading-tight">{hint}</p>}
       </div>
     </button>
   );
@@ -288,6 +338,28 @@ function FilterPill({ label, onRemove }) {
   );
 }
 
+// ── Style react-select (menyamakan input lain di filter panel) ────────────────
+const dpjpSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 38,
+    borderRadius: "0.75rem",
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#2d6a4f" : "#e5e7eb",
+    boxShadow: state.isFocused ? "0 0 0 2px rgb(45 106 79 / 0.3)" : "none",
+    "&:hover": { borderColor: state.isFocused ? "#2d6a4f" : "#d1d5db" },
+  }),
+  option: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    backgroundColor: state.isSelected ? "#2d6a4f" : state.isFocused ? "rgb(45 106 79 / 0.08)" : "white",
+    color: state.isSelected ? "white" : "#374151",
+    cursor: "pointer",
+  }),
+  placeholder: (base) => ({ ...base, color: "#9ca3af" }),
+  menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden", zIndex: 50 }),
+};
+
 // ── TAHAP labels ──────────────────────────────────────────────────────────────
 const TAHAP_FILTER_OPTIONS = [
   { value: "0", label: "Tahap 0 — Belum Mulai" },
@@ -301,16 +373,21 @@ const TAHAP_FILTER_OPTIONS = [
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, canKesimpulan, loading: authLoading } = useAuth();
+  const { user, canKesimpulan, canNotes, loading: authLoading } = useAuth();
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
-  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanDubia: 0, kesimpulanBonamSanam: 0, kesimpulanMalam: 0 });
+  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanDubia: 0, kesimpulanBonamSanam: 0, kesimpulanMalam: 0, meninggal: 0 });
   const [loading,         setLoading]         = useState(true);
   const [refreshing,      setRefreshing]      = useState(false);
   const [showFilters,     setShowFilters]     = useState(false);
   const [pagination,      setPagination]      = useState({ page: 1, totalPages: 1, total: 0 });
   const [kesimpulanModal, setKesimpulanModal] = useState(null); // { id, nama, noReg }
+  const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
+  const [notesModal,      setNotesModal]      = useState(null); // { noJadwal, noReg, nama }
+  const statusKeluarOptions = useStatusKeluarOptions();
+  const [dokterList,      setDokterList]      = useState([]);
+  const [dokterLoading,   setDokterLoading]   = useState(false);
 
   // ── Default filter: 3 bulan terakhir ────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
@@ -331,14 +408,36 @@ export default function HomePage() {
   const [penilaianFilter, setPenilaianFilter]  = useState(savedFilters.penilaianFilter ?? "");
   const [tanggalDari,     setTanggalDari]      = useState(savedFilters.tanggalDari     ?? threeMonthsAgo);
   const [tanggalSampai,   setTanggalSampai]    = useState(savedFilters.tanggalSampai   ?? today);
+  // DPJP disimpan sebagai { value: Kode_Dokter, label: Nama_Dokter } supaya label
+  // tetap tampil di pill walau list dokter belum selesai dimuat
+  const [dpjpFilter,      setDpjpFilter]       = useState(savedFilters.dpjpFilter      ?? null);
+  const [jenisRawatFilter, setJenisRawatFilter] = useState(savedFilters.jenisRawatFilter ?? "");
+  const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter ?? "");
 
   // ── Simpan filter ke sessionStorage setiap kali berubah ──────────────────
   useEffect(() => {
     sessionStorage.setItem(FILTER_KEY, JSON.stringify({
       searchInput, activeSearch, statusFilter, tahapFilter,
-      penilaianFilter, tanggalDari, tanggalSampai,
+      penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter,
     }));
-  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai]);
+  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
+
+  // ── Load daftar dokter untuk filter DPJP ──────────────────────────────────
+  useEffect(() => {
+    let active = true;
+    setDokterLoading(true);
+    getDokterList()
+      .then((res) => { if (active) setDokterList(res.data || []); })
+      .catch(() => { /* silent */ })
+      .finally(() => { if (active) setDokterLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const dokterOptions = dokterList.map((d) => ({
+    value: d.Kode_Dokter?.trim(),
+    label: d.Nama_Dokter?.trim() || d.Kode_Dokter?.trim(),
+    spesialis: d.Spesialis?.trim() || "",
+  }));
 
   // ── Bangun filter params (dipakai bersama fetchData & fetchStats) ──────────
   const buildFilterParams = useCallback(() => ({
@@ -348,7 +447,10 @@ export default function HomePage() {
     ...(penilaianFilter    && { penilaian: penilaianFilter }),
     ...(tanggalDari        && { tanggal_dari: tanggalDari }),
     ...(tanggalSampai      && { tanggal_sampai: tanggalSampai }),
-  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai]);
+    ...(dpjpFilter?.value  && { dpjp: dpjpFilter.value }),
+    ...(jenisRawatFilter   && { jenis_rawat: jenisRawatFilter }),
+    ...(kodeKeluarFilter   && { kode_keluar: kodeKeluarFilter }),
+  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
 
   // ── Fetch stats — mengikuti filter aktif ─────────────────────────────────
   const fetchStats = useCallback(async (filterParams = {}) => {
@@ -362,6 +464,7 @@ export default function HomePage() {
         kesimpulanDubia:      d.kesimpulan_dubia         || 0,
         kesimpulanBonamSanam: d.kesimpulan_bonam_sanam   || 0,
         kesimpulanMalam:      d.kesimpulan_malam         || 0,
+        meninggal:            d.meninggal                || 0,
       });
     } catch {
       // silent
@@ -406,11 +509,11 @@ export default function HomePage() {
   const resetFilters = () => {
     setSearchInput(""); setActiveSearch("");
     setStatusFilter(""); setTahapFilter("");
-    setPenilaianFilter("");
+    setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter("");
     setTanggalDari(threeMonthsAgo); setTanggalSampai(today);
   };
 
-  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai;
+  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai || dpjpFilter || jenisRawatFilter || kodeKeluarFilter;
 
   if (authLoading) {
     return (
@@ -452,13 +555,15 @@ export default function HomePage() {
       </div>
 
       {/* ── Stat cards (klikable jadi filter, mengikuti filter aktif) ──────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Total Penilaian"  value={stats.total}                color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter}              onClick={resetFilters} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <StatCard label="Total Penilaian"  value={stats.total}                color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter && !kodeKeluarFilter}              onClick={resetFilters} />
         <StatCard label="Selesai"          value={stats.selesai}              color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2   className="w-4 h-4 text-emerald-500" />} active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
         <StatCard label="Sedang Berjalan"  value={stats.inProgress}           color="bg-amber-50 border-amber-100"     icon={<Clock          className="w-4 h-4 text-amber-500"   />} active={statusFilter === "draft"}                      onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setPenilaianFilter(""); setActiveSearch(""); setSearchInput(""); }} />
-        <StatCard label="Dubia"            value={stats.kesimpulanDubia}      color="bg-amber-50 border-amber-100"     icon={<ThumbsUp       className="w-4 h-4 text-amber-500"   />} active={penilaianFilter === "Dubia"}                   onClick={() => { setPenilaianFilter((p) => p === "Dubia" ? "" : "Dubia"); setStatusFilter(""); }} />
-        <StatCard label="Bonam / Sanam"    value={stats.kesimpulanBonamSanam} color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Bonam / Sanam"}           onClick={() => { setPenilaianFilter((p) => p === "Bonam / Sanam" ? "" : "Bonam / Sanam"); setStatusFilter(""); }} />
-        <StatCard label="Malam"            value={stats.kesimpulanMalam}      color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Malam"}                   onClick={() => { setPenilaianFilter((p) => p === "Malam" ? "" : "Malam"); setStatusFilter(""); }} />
+        {/* Kesimpulan diurutkan dari prognosis terbaik → terburuk */}
+        <StatCard label="Bonam / Sanam"    hint="Prognosis baik"       value={stats.kesimpulanBonamSanam} color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Bonam / Sanam"}           onClick={() => { setPenilaianFilter((p) => p === "Bonam / Sanam" ? "" : "Bonam / Sanam"); setStatusFilter(""); }} />
+        <StatCard label="Dubia"            hint="Prognosis meragukan"  value={stats.kesimpulanDubia}      color="bg-amber-50 border-amber-100"     icon={<CircleHelp     className="w-4 h-4 text-amber-500"   />} active={penilaianFilter === "Dubia"}                   onClick={() => { setPenilaianFilter((p) => p === "Dubia" ? "" : "Dubia"); setStatusFilter(""); }} />
+        <StatCard label="Malam"            hint="Prognosis buruk"      value={stats.kesimpulanMalam}      color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Malam"}                   onClick={() => { setPenilaianFilter((p) => p === "Malam" ? "" : "Malam"); setStatusFilter(""); }} />
+        <StatCard label="Meninggal"        hint="< 48 jam, > 48 jam, D.O.A." value={stats.meninggal}            color="bg-rose-50 border-rose-100"       icon={<HeartCrack     className="w-4 h-4 text-rose-500"    />} active={kodeKeluarFilter === "MENINGGAL"}              onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL" ? "" : "MENINGGAL")} />
       </div>
 
       {/* ── Cards section ────────────────────────────────────────────────── */}
@@ -483,7 +588,7 @@ export default function HomePage() {
               Filter
               {hasActiveFilter && (
                 <span className="w-4 h-4 rounded-full bg-white text-[#2d6a4f] text-[10px] font-bold flex items-center justify-center">
-                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai].filter(Boolean).length}
+                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai, dpjpFilter?.value, jenisRawatFilter, kodeKeluarFilter].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -555,9 +660,9 @@ export default function HomePage() {
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
                 >
                   <option value="">— Semua Penilaian —</option>
-                  <option value="Dubia">Dubia</option>
-                  <option value="Bonam / Sanam">Bonam / Sanam</option>
-                  <option value="Malam">Malam</option>
+                  <option value="Bonam / Sanam">Bonam / Sanam — prognosis baik</option>
+                  <option value="Dubia">Dubia — prognosis meragukan</option>
+                  <option value="Malam">Malam — prognosis buruk</option>
                 </select>
               </div>
 
@@ -570,6 +675,64 @@ export default function HomePage() {
                   <X className="w-3.5 h-3.5" /> Reset Filter
                 </button>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Status Keluar */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Keluar</label>
+              <StatusKeluarSelect value={kodeKeluarFilter} onChange={setKodeKeluarFilter} />
+            </div>
+
+            {/* Jenis Rawat */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                <BedDouble className="inline w-3.5 h-3.5 mr-1" />Jenis Rawat
+              </label>
+              <select
+                value={jenisRawatFilter}
+                onChange={(e) => setJenisRawatFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
+              >
+                <option value="">— Semua Jenis Rawat —</option>
+                {JENIS_RAWAT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* DPJP */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                <Stethoscope className="inline w-3.5 h-3.5 mr-1" />DPJP
+              </label>
+              <Select
+                value={dpjpFilter}
+                onChange={(opt) => setDpjpFilter(opt ? { value: opt.value, label: opt.label } : null)}
+                options={dokterOptions}
+                isClearable
+                isLoading={dokterLoading}
+                placeholder="— Semua DPJP — (ketik untuk cari)"
+                noOptionsMessage={() => "Dokter tidak ditemukan"}
+                formatOptionLabel={(opt, { context }) =>
+                  context === "menu" && opt.spesialis ? (
+                    <div className="flex flex-col">
+                      <span>{opt.label}</span>
+                      <span className="text-[11px] opacity-70">{opt.spesialis}</span>
+                    </div>
+                  ) : opt.label
+                }
+                filterOption={(opt, input) => {
+                  const q = input.toLowerCase();
+                  return (
+                    opt.data.label?.toLowerCase().includes(q) ||
+                    opt.data.value?.toLowerCase().includes(q) ||
+                    opt.data.spesialis?.toLowerCase().includes(q)
+                  );
+                }}
+                styles={dpjpSelectStyles}
+              />
+            </div>
             </div>
 
             {/* Tanggal range */}
@@ -607,6 +770,9 @@ export default function HomePage() {
             {statusFilter       && <FilterPill label={statusFilter === "selesai" ? "Selesai" : "Draft"}       onRemove={() => setStatusFilter("")} />}
             {tahapFilter !== "" && <FilterPill label={TAHAP_FILTER_OPTIONS.find(o => o.value === tahapFilter)?.label} onRemove={() => setTahapFilter("")} />}
             {penilaianFilter    && <FilterPill label={`Penilaian: ${penilaianFilter}`}                         onRemove={() => setPenilaianFilter("")} />}
+            {dpjpFilter         && <FilterPill label={`DPJP: ${dpjpFilter.label}`}                             onRemove={() => setDpjpFilter(null)} />}
+            {jenisRawatFilter   && <FilterPill label={`Jenis Rawat: ${jenisRawatFilter}`}                      onRemove={() => setJenisRawatFilter("")} />}
+            {kodeKeluarFilter   && <FilterPill label={`Status Keluar: ${kodeKeluarFilter === "MENINGGAL" ? "Meninggal (semua)" : (statusKeluarOptions.find((o) => o.value === kodeKeluarFilter)?.label ?? kodeKeluarFilter)}`} onRemove={() => setKodeKeluarFilter("")} />}
             {tanggalDari        && <FilterPill label={`Dari: ${tanggalDari}`}                                  onRemove={() => setTanggalDari("")} />}
             {tanggalSampai      && <FilterPill label={`Sampai: ${tanggalSampai}`}                              onRemove={() => setTanggalSampai("")} />}
           </div>
@@ -647,6 +813,9 @@ export default function HomePage() {
                   onView={(id) => navigate(`/ok-quality/${id}`, { state: { activeMenu: "/home" } })}
                   onEdit={(id) => navigate(`/ok-quality/form/${id}`, { state: { activeMenu: "/home" } })}
                   onKesimpulan={(r) => setKesimpulanModal({ id: r.Id, nama: r.Nama_Pasien, noReg: r.No_Reg })}
+                  onPerjalanan={(r) => setPerjalananModal({ noReg: r.No_Reg, nama: r.Nama_Pasien })}
+                  onNotes={(r) => setNotesModal({ noJadwal: r.No_Jadwal, noReg: r.No_Reg, nama: r.Nama_Pasien })}
+                  canNotes={canNotes}
                   canKesimpulan={canKesimpulan}
                 />
               ))}
@@ -671,6 +840,26 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* Perjalanan Perpindahan Pasien Modal */}
+      {perjalananModal && (
+        <PerjalananPasienModal
+          noReg={perjalananModal.noReg}
+          namaPasien={perjalananModal.nama}
+          onClose={() => setPerjalananModal(null)}
+        />
+      )}
+
+      {/* Notes Modal (role ok-quality-notes) */}
+      {notesModal && (
+        <NotesModal
+          noJadwal={notesModal.noJadwal}
+          noReg={notesModal.noReg}
+          namaPasien={notesModal.nama}
+          onClose={() => setNotesModal(null)}
+          onSaved={() => fetchData({ page: pagination.page, refresh: true })}
+        />
+      )}
 
       {/* Kesimpulan Modal */}
       {kesimpulanModal && (

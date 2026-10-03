@@ -9,6 +9,24 @@ export async function getStats(params = {}) {
   return res.data;
 }
 
+// ── STATUS KELUAR (master M_PASIENCLOSING, untuk filter) ────────────────────
+export async function getStatusKeluar() {
+  const res = await axios.get(`${BASE}/status-keluar`, cfg);
+  return res.data;
+}
+
+// ── NOTES (role ok-quality-notes — hanya catatan milik user sendiri) ───────
+// params: { no_jadwal } atau { no_reg } (data lama tanpa No_Jadwal)
+export async function getNotes(params = {}) {
+  const res = await axios.get(`${BASE}/notes`, { ...cfg, params });
+  return res.data;
+}
+
+export async function createNote(data) {
+  const res = await axios.post(`${BASE}/notes`, data, cfg);
+  return res.data;
+}
+
 // ── LIST ────────────────────────────────────────────────────────────────────
 export async function getAll(params = {}) {
   const res = await axios.get(BASE, { ...cfg, params });

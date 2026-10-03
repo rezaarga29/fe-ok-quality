@@ -26,6 +26,7 @@ export async function getSession() {
       is_admin:       data.is_admin       ?? false,
       is_doctor:      data.is_doctor      ?? false,
       can_kesimpulan: data.can_kesimpulan ?? false,
+      can_notes:      data.can_notes      ?? false,
       expires_at:     data.expires_at,
     };
   } catch {

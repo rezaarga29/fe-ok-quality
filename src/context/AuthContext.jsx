@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [isAdmin,       setIsAdmin]       = useState(false);
   const [isDoctor,      setIsDoctor]      = useState(false);
   const [canKesimpulan, setCanKesimpulan] = useState(false);
+  const [canNotes,      setCanNotes]      = useState(false); // role ok-quality-notes
   const [loading,       setLoading]       = useState(true);
 
   useEffect(() => { loadUser(); }, []);
@@ -19,6 +20,7 @@ export function AuthProvider({ children }) {
       setIsAdmin(session.is_admin       ?? false);
       setIsDoctor(session.is_doctor      ?? false);
       setCanKesimpulan(session.can_kesimpulan ?? false);
+      setCanNotes(session.can_notes ?? false);
     } catch {
       setUser(null);
       setIsAdmin(false);
@@ -32,10 +34,11 @@ export function AuthProvider({ children }) {
     setIsAdmin(false);
     setIsDoctor(false);
     setCanKesimpulan(false);
+    setCanNotes(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isDoctor, canKesimpulan, loading, loadUser, clearUser }}>
+    <AuthContext.Provider value={{ user, isAdmin, isDoctor, canKesimpulan, canNotes, loading, loadUser, clearUser }}>
       {children}
     </AuthContext.Provider>
   );
