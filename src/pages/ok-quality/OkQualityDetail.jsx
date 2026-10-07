@@ -25,13 +25,16 @@ import {
   X,
   Search,
   Users,
+  FileText,
 } from "lucide-react";
 import {
   getById,
   getKesimpulan,
   getTimMedis,
   getRiwayat,
+  getSuratKematian,
 } from "../../services/ok_quality.service";
+import { StatusKeluarBadge } from "../../components/OkqShared";
 import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { useAuth } from "../../context/AuthContext";
 import KesimpulanModal from "./KesimpulanModal";
@@ -426,6 +429,86 @@ const fmtDateTime = (d) => {
   return result;
 };
 
+// ── Surat Keterangan Kematian ─────────────────────────────────────────────────
+// Kode_Keluar A (<48 jam), B (>48 jam), C (D.O.A.) = meninggal
+const KODE_MENINGGAL = ["A", "B", "C"];
+const isMeninggal = (kode) =>
+  KODE_MENINGGAL.includes(String(kode ?? "").trim().toUpperCase());
+
+// Tanggal dari BE sudah string "yyyy-mm-dd" (lokal, tanpa timezone)
+const fmtTanggalLokal = (s) => {
+  if (!s) return null;
+  const dt = new Date(`${s}T00:00:00`);
+  return isNaN(dt.getTime())
+    ? s
+    : dt.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+};
+
+function SuratKematianModal({ surat, onClose }) {
+  const records = surat?.records || [];
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-red-100 bg-red-50/50 shrink-0">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-red-100 text-red-600">
+          <FileText className="w-4 h-4" />
+        </div>
+        <h3 className="text-sm font-bold text-gray-700">
+          Surat Keterangan Kematian
+        </h3>
+        <span className="ml-auto">
+          <StatusKeluarBadge kode={surat?.Kode_Keluar} ket={surat?.Ket_Keluar} />
+        </span>
+        <button
+          onClick={onClose}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="p-5 overflow-y-auto">
+        {records.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">
+            Pasien keluar meninggal, tetapi Surat Keterangan Kematian belum diisi
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {records.map((r, i) => (
+              <div
+                key={`${r.NoSurat || "sk"}-${i}`}
+                className={`grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 ${i > 0 ? "pt-4 border-t border-dashed border-gray-200" : ""}`}
+              >
+                <InfoRow label="No. Surat" value={r.NoSurat} />
+                <InfoRow
+                  label="Tanggal / Jam"
+                  value={
+                    [fmtTanggalLokal(r.Tanggal), r.Jam].filter(Boolean).join(" · ") ||
+                    null
+                  }
+                />
+                <InfoRow label="Telah Meninggal" value={r.TelahMeninggal} span />
+                <InfoRow label="Keterangan" value={r.Keterangan} span />
+                <InfoRow label="Dibuat Oleh" value={r.NamaUser} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ══════════════════════════════════════════════════════════════════════════════
@@ -438,13 +521,17 @@ export default function OkQualityDetail() {
   const [penandaan, setPenandaan] = useState(null);
   const [timMedis, setTimMedis] = useState(null);
   const [riwayat, setRiwayat] = useState([]);
+  const [suratKematian, setSuratKematian] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showKesimpulanModal, setShowKesimpulanModal] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [timMedisModalOpen, setTimMedisModalOpen] = useState(false);
+  const [suratKematianOpen, setSuratKematianOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setSuratKematian(null);
+    setSuratKematianOpen(false);
     Promise.all([getById(id), getKesimpulan(id)])
       .then(([detailRes, kesimpulanRes]) => {
         const d = detailRes.data;
@@ -460,6 +547,12 @@ export default function OkQualityDetail() {
           getRiwayat(d.No_Reg)
             .then((r) => setRiwayat(r.data || []))
             .catch(() => {});
+          // Surat Keterangan Kematian — hanya kalau pasien keluar meninggal
+          if (isMeninggal(d.Kode_Keluar)) {
+            getSuratKematian(d.No_Reg)
+              .then((r) => setSuratKematian(r.data?.isMeninggal ? r.data : null))
+              .catch(() => {});
+          }
         }
         // Tim medis (anastesi, dokter operator, perawat) — butuh No_Jadwal
         if (d?.No_Jadwal) {
@@ -527,6 +620,19 @@ export default function OkQualityDetail() {
           Kembali
         </button>
         <div className="flex items-center gap-2">
+          {/* Tombol Surat Keterangan Kematian — hanya pasien keluar meninggal */}
+          {suratKematian && (
+            <button
+              onClick={() => setSuratKematianOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Surat Kematian
+              {suratKematian.records?.length === 0 && (
+                <span className="text-[10px] font-semibold text-red-400">(belum diisi)</span>
+              )}
+            </button>
+          )}
           {/* Tombol Tim Medis — anastesi, dokter operator, perawat */}
           {hasTimMedis && (
             <button
@@ -1177,6 +1283,14 @@ export default function OkQualityDetail() {
       )}
 
       {/* Modal Tim Medis */}
+      {/* ── MODAL SURAT KETERANGAN KEMATIAN ─────────────────────────────────── */}
+      {suratKematianOpen && suratKematian && (
+        <SuratKematianModal
+          surat={suratKematian}
+          onClose={() => setSuratKematianOpen(false)}
+        />
+      )}
+
       {timMedisModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"

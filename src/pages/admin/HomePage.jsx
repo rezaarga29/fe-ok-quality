@@ -12,6 +12,7 @@ import { getAll, getStats } from "../../services/ok_quality.service";
 import { getDokterList } from "../../services/dokter.service";
 import KesimpulanModal from "../ok-quality/KesimpulanModal";
 import PerjalananPasienModal from "../ok-quality/PerjalananPasienModal";
+import SuratKematianModal, { SuratKematianButton } from "../ok-quality/SuratKematianModal";
 import NotesModal from "../ok-quality/NotesModal";
 import { StatusKeluarBadge, StatusKeluarSelect, useStatusKeluarOptions, NotePreview, NotesButton } from "../../components/OkqShared";
 
@@ -201,7 +202,7 @@ function fmtDurasi(menit) {
 }
 
 // ── Patient card ──────────────────────────────────────────────────────────────
-function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onNotes, canKesimpulan, canNotes }) {
+function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratKematian, onNotes, canKesimpulan, canNotes }) {
   const nama     = row.Nama_Pasien ?? "-";
   const initials = nama.split(" ").slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
   const tanggal  = row.Tanggal
@@ -268,6 +269,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onNotes,
           {canNotes && (
             <NotesButton count={row.Notes_Count} size="sm" onClick={() => onNotes(row)} />
           )}
+          <SuratKematianButton kode={row.Kode_Keluar} size="sm" onClick={() => onSuratKematian(row)} />
           <button
             onClick={() => onPerjalanan(row)}
             className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
@@ -384,6 +386,7 @@ export default function HomePage() {
   const [pagination,      setPagination]      = useState({ page: 1, totalPages: 1, total: 0 });
   const [kesimpulanModal, setKesimpulanModal] = useState(null); // { id, nama, noReg }
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
+  const [suratKematianModal, setSuratKematianModal] = useState(null); // { noReg, nama }
   const [notesModal,      setNotesModal]      = useState(null); // { noJadwal, noReg, nama }
   const statusKeluarOptions = useStatusKeluarOptions();
   const [dokterList,      setDokterList]      = useState([]);
@@ -814,6 +817,7 @@ export default function HomePage() {
                   onEdit={(id) => navigate(`/ok-quality/form/${id}`, { state: { activeMenu: "/home" } })}
                   onKesimpulan={(r) => setKesimpulanModal({ id: r.Id, nama: r.Nama_Pasien, noReg: r.No_Reg })}
                   onPerjalanan={(r) => setPerjalananModal({ noReg: r.No_Reg, nama: r.Nama_Pasien })}
+                  onSuratKematian={(r) => setSuratKematianModal({ noReg: r.No_Reg, nama: r.Nama_Pasien })}
                   onNotes={(r) => setNotesModal({ noJadwal: r.No_Jadwal, noReg: r.No_Reg, nama: r.Nama_Pasien })}
                   canNotes={canNotes}
                   canKesimpulan={canKesimpulan}
@@ -840,6 +844,15 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* Surat Keterangan Kematian Modal */}
+      {suratKematianModal && (
+        <SuratKematianModal
+          noReg={suratKematianModal.noReg}
+          namaPasien={suratKematianModal.nama}
+          onClose={() => setSuratKematianModal(null)}
+        />
+      )}
 
       {/* Perjalanan Perpindahan Pasien Modal */}
       {perjalananModal && (
