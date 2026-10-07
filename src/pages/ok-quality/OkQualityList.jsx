@@ -4,6 +4,7 @@ import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, C
 import { getAll } from "../../services/ok_quality.service";
 import KesimpulanModal from "./KesimpulanModal";
 import PerjalananPasienModal from "./PerjalananPasienModal";
+import SuratKematianModal, { SuratKematianButton } from "./SuratKematianModal";
 import NotesModal from "./NotesModal";
 import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, StatusKeluarSelect, StatusKeluarBadge, NotePreview, NotesButton } from "../../components/OkqShared";
 import { useAuth } from "../../context/AuthContext";
@@ -153,6 +154,7 @@ export default function OkQualityList() {
   const [dpjpFilter, setDpjpFilter]           = useState(null); // { value, label }
   const [jenisRawatFilter, setJenisRawatFilter] = useState("");
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
+  const [suratKematianModal, setSuratKematianModal] = useState(null); // { noReg, nama }
   const [kodeKeluarFilter, setKodeKeluarFilter] = useState("");
   const [notesModal, setNotesModal]           = useState(null); // { noJadwal, noReg, nama }
   const [pagination, setPagination]           = useState({ page: 1, totalPages: 1, total: 0 });
@@ -347,6 +349,10 @@ export default function OkQualityList() {
                           {canNotes && (
                             <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
                           )}
+                          <SuratKematianButton
+                            kode={row.Kode_Keluar}
+                            onClick={() => setSuratKematianModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                          />
                           <button
                             onClick={() => setPerjalananModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
                             className="p-2 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
@@ -436,6 +442,10 @@ export default function OkQualityList() {
                       {canNotes && (
                         <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
                       )}
+                      <SuratKematianButton
+                        kode={row.Kode_Keluar}
+                        onClick={() => setSuratKematianModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
+                      />
                       <button
                         onClick={() => setPerjalananModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
                         className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
@@ -485,6 +495,15 @@ export default function OkQualityList() {
           noReg={perjalananModal.noReg}
           namaPasien={perjalananModal.nama}
           onClose={() => setPerjalananModal(null)}
+        />
+      )}
+
+      {/* Surat Keterangan Kematian Modal */}
+      {suratKematianModal && (
+        <SuratKematianModal
+          noReg={suratKematianModal.noReg}
+          namaPasien={suratKematianModal.nama}
+          onClose={() => setSuratKematianModal(null)}
         />
       )}
 

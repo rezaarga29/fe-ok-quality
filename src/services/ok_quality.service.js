@@ -104,6 +104,13 @@ export async function getLembarTransferStatus(no_reg) {
   return res.data;
 }
 
+// ── SURAT KETERANGAN KEMATIAN (referensi read-only, dari ASESMEN_SURATKET_KEMATIAN) ──
+// Hanya berisi record kalau pasien keluar meninggal (Kode_Keluar A/B/C)
+export async function getSuratKematian(no_reg) {
+  const res = await axios.get(`${BASE}/surat-kematian/${no_reg}`, cfg);
+  return res.data;
+}
+
 // ── CREATE ──────────────────────────────────────────────────────────────────
 export async function create(data) {
   const res = await axios.post(BASE, data, cfg);
