@@ -14,7 +14,7 @@ import KesimpulanModal from "../ok-quality/KesimpulanModal";
 import PerjalananPasienModal from "../ok-quality/PerjalananPasienModal";
 import SuratKematianModal, { SuratKematianButton } from "../ok-quality/SuratKematianModal";
 import NotesModal from "../ok-quality/NotesModal";
-import { StatusKeluarBadge, StatusKeluarSelect, useStatusKeluarOptions, NotePreview, NotesButton } from "../../components/OkqShared";
+import { MeninggalBadge, MeninggalSelect, NotePreview, NotesButton } from "../../components/OkqShared";
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 function Pagination({ pagination, limit = 20, onPage }) {
@@ -233,7 +233,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
         <div className="flex flex-col items-end gap-1 shrink-0">
           <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
           <JenisRawatBadge jenis={row.Jenis_Rawat} />
-          <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+          <MeninggalBadge meninggal={row.Is_Meninggal} />
         </div>
       </div>
 
@@ -269,7 +269,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
           {canNotes && (
             <NotesButton count={row.Notes_Count} size="sm" onClick={() => onNotes(row)} />
           )}
-          <SuratKematianButton kode={row.Kode_Keluar} size="sm" onClick={() => onSuratKematian(row)} />
+          <SuratKematianButton meninggal={row.Is_Meninggal} size="sm" onClick={() => onSuratKematian(row)} />
           <button
             onClick={() => onPerjalanan(row)}
             className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
@@ -388,7 +388,6 @@ export default function HomePage() {
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
   const [suratKematianModal, setSuratKematianModal] = useState(null); // { noReg, nama }
   const [notesModal,      setNotesModal]      = useState(null); // { noJadwal, noReg, nama }
-  const statusKeluarOptions = useStatusKeluarOptions();
   const [dokterList,      setDokterList]      = useState([]);
   const [dokterLoading,   setDokterLoading]   = useState(false);
 
@@ -415,7 +414,7 @@ export default function HomePage() {
   // tetap tampil di pill walau list dokter belum selesai dimuat
   const [dpjpFilter,      setDpjpFilter]       = useState(savedFilters.dpjpFilter      ?? null);
   const [jenisRawatFilter, setJenisRawatFilter] = useState(savedFilters.jenisRawatFilter ?? "");
-  const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter ?? "");
+  const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter === "MENINGGAL" ? "MENINGGAL" : ""); // "" | "MENINGGAL"
 
   // ── Simpan filter ke sessionStorage setiap kali berubah ──────────────────
   useEffect(() => {
@@ -566,7 +565,7 @@ export default function HomePage() {
         <StatCard label="Bonam / Sanam"    hint="Prognosis baik"       value={stats.kesimpulanBonamSanam} color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Bonam / Sanam"}           onClick={() => { setPenilaianFilter((p) => p === "Bonam / Sanam" ? "" : "Bonam / Sanam"); setStatusFilter(""); }} />
         <StatCard label="Dubia"            hint="Prognosis meragukan"  value={stats.kesimpulanDubia}      color="bg-amber-50 border-amber-100"     icon={<CircleHelp     className="w-4 h-4 text-amber-500"   />} active={penilaianFilter === "Dubia"}                   onClick={() => { setPenilaianFilter((p) => p === "Dubia" ? "" : "Dubia"); setStatusFilter(""); }} />
         <StatCard label="Malam"            hint="Prognosis buruk"      value={stats.kesimpulanMalam}      color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Malam"}                   onClick={() => { setPenilaianFilter((p) => p === "Malam" ? "" : "Malam"); setStatusFilter(""); }} />
-        <StatCard label="Meninggal"        hint="< 48 jam, > 48 jam, D.O.A." value={stats.meninggal}            color="bg-rose-50 border-rose-100"       icon={<HeartCrack     className="w-4 h-4 text-rose-500"    />} active={kodeKeluarFilter === "MENINGGAL"}              onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL" ? "" : "MENINGGAL")} />
+        <StatCard label="Meninggal"        hint="Surat Ket. Kematian" value={stats.meninggal}            color="bg-rose-50 border-rose-100"       icon={<HeartCrack     className="w-4 h-4 text-rose-500"    />} active={kodeKeluarFilter === "MENINGGAL"}              onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL" ? "" : "MENINGGAL")} />
       </div>
 
       {/* ── Cards section ────────────────────────────────────────────────── */}
@@ -681,10 +680,10 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Status Keluar */}
+            {/* Status Pasien (meninggal) */}
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Keluar</label>
-              <StatusKeluarSelect value={kodeKeluarFilter} onChange={setKodeKeluarFilter} />
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Pasien</label>
+              <MeninggalSelect value={kodeKeluarFilter} onChange={setKodeKeluarFilter} />
             </div>
 
             {/* Jenis Rawat */}
@@ -775,7 +774,7 @@ export default function HomePage() {
             {penilaianFilter    && <FilterPill label={`Penilaian: ${penilaianFilter}`}                         onRemove={() => setPenilaianFilter("")} />}
             {dpjpFilter         && <FilterPill label={`DPJP: ${dpjpFilter.label}`}                             onRemove={() => setDpjpFilter(null)} />}
             {jenisRawatFilter   && <FilterPill label={`Jenis Rawat: ${jenisRawatFilter}`}                      onRemove={() => setJenisRawatFilter("")} />}
-            {kodeKeluarFilter   && <FilterPill label={`Status Keluar: ${kodeKeluarFilter === "MENINGGAL" ? "Meninggal (semua)" : (statusKeluarOptions.find((o) => o.value === kodeKeluarFilter)?.label ?? kodeKeluarFilter)}`} onRemove={() => setKodeKeluarFilter("")} />}
+            {kodeKeluarFilter   && <FilterPill label="Pasien Meninggal" onRemove={() => setKodeKeluarFilter("")} />}
             {tanggalDari        && <FilterPill label={`Dari: ${tanggalDari}`}                                  onRemove={() => setTanggalDari("")} />}
             {tanggalSampai      && <FilterPill label={`Sampai: ${tanggalSampai}`}                              onRemove={() => setTanggalSampai("")} />}
           </div>

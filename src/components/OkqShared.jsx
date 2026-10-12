@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import Select from "react-select";
-import { BedDouble, Footprints, LogOut, StickyNote } from "lucide-react";
+import { BedDouble, Footprints, HeartCrack, StickyNote } from "lucide-react";
 import { getDokterList } from "../services/dokter.service";
-import { getStatusKeluar } from "../services/ok_quality.service";
 
 // Komponen kecil yang dipakai bersama di halaman Penilaian OK Quality
 // (/ok-quality) dan Jadwal Operasi (/jadwal-operasi): filter DPJP, filter &
@@ -44,66 +43,33 @@ export function JenisRawatSelect({ value, onChange, className = "" }) {
   );
 }
 
-// ── Status Keluar (PENDAFTARAN.Kode_Keluar → M_PASIENCLOSING) ────────────────
-// Warna per kelompok kode: 0 belum pulang, 1 pulang, 2-8 rujuk/pindah,
-// 9/X pulang paksa/lari, A/B/C meninggal/DOA, D perbaikan.
-function statusKeluarStyle(kode) {
-  const k = String(kode ?? "").trim().toUpperCase();
-  if (k === "0") return "bg-gray-100 text-gray-600";
-  if (k === "1") return "bg-emerald-100 text-emerald-700";
-  if (["A", "B", "C"].includes(k)) return "bg-red-100 text-red-700";
-  if (["9", "X"].includes(k)) return "bg-orange-100 text-orange-700";
-  if (k === "D") return "bg-teal-100 text-teal-700";
-  return "bg-blue-100 text-blue-700"; // 2-8: rujuk / pindah / panti
-}
+// ── Pasien Meninggal (No_Reg ada di ASESMEN_SURATKET_KEMATIAN) ──────────────
+// BE mengirim flag Is_Meninggal (0/1) di setiap baris list / detail / jadwal.
+export const isPasienMeninggal = (flag) => flag === true || Number(flag) === 1;
 
-export function StatusKeluarBadge({ kode, ket }) {
-  if (!ket && (kode === null || kode === undefined || kode === "")) return null;
+export function MeninggalBadge({ meninggal }) {
+  if (!isPasienMeninggal(meninggal)) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusKeluarStyle(kode)}`}
-      title={`Status keluar (kode ${kode ?? "-"})`}
+      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+      title="Pasien meninggal (ada Surat Keterangan Kematian)"
     >
-      <LogOut className="w-3 h-3 shrink-0" />
-      <span className="truncate max-w-[180px]">{ket || `Kode ${kode}`}</span>
+      <HeartCrack className="w-3 h-3 shrink-0" />
+      Meninggal
     </span>
   );
 }
 
-// Master dimuat sekali, dipakai bersama oleh semua select di aplikasi
-let statusKeluarCache = null;
-export function useStatusKeluarOptions() {
-  const [options, setOptions] = useState(statusKeluarCache || []);
-  useEffect(() => {
-    if (statusKeluarCache) return;
-    let active = true;
-    getStatusKeluar()
-      .then((res) => {
-        statusKeluarCache = (res.data || []).map((r) => ({
-          value: String(r.Kode_Keluar ?? "").trim(),
-          label: r.Ket_Keluar,
-        }));
-        if (active) setOptions(statusKeluarCache);
-      })
-      .catch(() => { /* silent */ });
-    return () => { active = false; };
-  }, []);
-  return options;
-}
-
-export function StatusKeluarSelect({ value, onChange, className = "" }) {
-  const options = useStatusKeluarOptions();
+// value: "" (semua pasien) | "MENINGGAL"
+export function MeninggalSelect({ value, onChange, className = "" }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white ${className}`}
     >
-      <option value="">— Semua Status Keluar —</option>
-      <option value="MENINGGAL">Meninggal (semua: &lt;48 jam, &gt;48 jam, D.O.A.)</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
+      <option value="">— Semua Pasien —</option>
+      <option value="MENINGGAL">Meninggal</option>
     </select>
   );
 }

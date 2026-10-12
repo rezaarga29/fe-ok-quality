@@ -22,7 +22,7 @@ import {
 import { getJadwal } from "../../services/ok_quality.service";
 import PerjalananPasienModal from "./PerjalananPasienModal";
 import NotesModal from "./NotesModal";
-import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, StatusKeluarSelect, StatusKeluarBadge, NotePreview, NotesButton } from "../../components/OkqShared";
+import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, MeninggalSelect, MeninggalBadge, isPasienMeninggal, NotePreview, NotesButton } from "../../components/OkqShared";
 import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 
@@ -191,7 +191,7 @@ export default function JadwalOperasiPage() {
   const [dpjp,       setDpjp]         = useState(null); // { value: Kode_Dokter, label }
   const [jenisRawat, setJenisRawat]   = useState("");   // "" | "RAWAT INAP" | "ODC"
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
-  const [kodeKeluar, setKodeKeluar]   = useState("");   // M_PASIENCLOSING.KODE_KELUAR
+  const [kodeKeluar, setKodeKeluar]   = useState("");   // "" | "MENINGGAL" (ASESMEN_SURATKET_KEMATIAN)
   const [notesModal, setNotesModal]   = useState(null); // { noJadwal, noReg, nama }
 
   const LIMIT = 20;
@@ -426,10 +426,10 @@ export default function JadwalOperasiPage() {
               <JenisRawatSelect value={jenisRawat} onChange={setJenisRawat} />
             </div>
 
-            {/* Filter Status Keluar */}
+            {/* Filter Pasien Meninggal */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Status Keluar</label>
-              <StatusKeluarSelect value={kodeKeluar} onChange={setKodeKeluar} />
+              <label className="block text-xs font-medium text-gray-500 mb-1">Status Pasien</label>
+              <MeninggalSelect value={kodeKeluar} onChange={setKodeKeluar} />
             </div>
 
             {/* Search teks */}
@@ -575,10 +575,10 @@ export default function JadwalOperasiPage() {
                             <BedDouble className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span className="font-medium">{row.Kamar || "-"}</span>
                           </div>
-                          {(row.Jenis_Rawat || row.Ket_Keluar) && (
+                          {(row.Jenis_Rawat || isPasienMeninggal(row.Is_Meninggal)) && (
                             <div className="mt-1 flex flex-col items-start gap-1">
                               <JenisRawatBadge jenis={row.Jenis_Rawat} />
-                              <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                              <MeninggalBadge meninggal={row.Is_Meninggal} />
                             </div>
                           )}
                         </td>
@@ -673,9 +673,9 @@ export default function JadwalOperasiPage() {
                         <span>{row.Kamar || "-"}</span>
                         <JenisRawatBadge jenis={row.Jenis_Rawat} />
                       </div>
-                      {row.Ket_Keluar && (
+                      {isPasienMeninggal(row.Is_Meninggal) && (
                         <div className="col-span-2">
-                          <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                          <MeninggalBadge meninggal={row.Is_Meninggal} />
                         </div>
                       )}
                       <div className="col-span-2 flex items-center gap-1.5">
