@@ -34,7 +34,7 @@ import {
   getRiwayat,
   getSuratKematian,
 } from "../../services/ok_quality.service";
-import { StatusKeluarBadge } from "../../components/OkqShared";
+import { MeninggalBadge, isPasienMeninggal } from "../../components/OkqShared";
 import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { useAuth } from "../../context/AuthContext";
 import KesimpulanModal from "./KesimpulanModal";
@@ -430,10 +430,8 @@ const fmtDateTime = (d) => {
 };
 
 // ── Surat Keterangan Kematian ─────────────────────────────────────────────────
-// Kode_Keluar A (<48 jam), B (>48 jam), C (D.O.A.) = meninggal
-const KODE_MENINGGAL = ["A", "B", "C"];
-const isMeninggal = (kode) =>
-  KODE_MENINGGAL.includes(String(kode ?? "").trim().toUpperCase());
+// Meninggal = No_Reg ada di ASESMEN_SURATKET_KEMATIAN (flag Is_Meninggal dari BE)
+const isMeninggal = isPasienMeninggal;
 
 // Tanggal dari BE sudah string "yyyy-mm-dd" (lokal, tanpa timezone)
 const fmtTanggalLokal = (s) => {
@@ -467,7 +465,7 @@ function SuratKematianModal({ surat, onClose }) {
           Surat Keterangan Kematian
         </h3>
         <span className="ml-auto">
-          <StatusKeluarBadge kode={surat?.Kode_Keluar} ket={surat?.Ket_Keluar} />
+          <MeninggalBadge meninggal={surat?.isMeninggal} />
         </span>
         <button
           onClick={onClose}
@@ -547,8 +545,8 @@ export default function OkQualityDetail() {
           getRiwayat(d.No_Reg)
             .then((r) => setRiwayat(r.data || []))
             .catch(() => {});
-          // Surat Keterangan Kematian — hanya kalau pasien keluar meninggal
-          if (isMeninggal(d.Kode_Keluar)) {
+          // Surat Keterangan Kematian — hanya kalau ada di ASESMEN_SURATKET_KEMATIAN
+          if (isMeninggal(d.Is_Meninggal)) {
             getSuratKematian(d.No_Reg)
               .then((r) => setSuratKematian(r.data?.isMeninggal ? r.data : null))
               .catch(() => {});

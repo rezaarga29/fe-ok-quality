@@ -6,7 +6,7 @@ import KesimpulanModal from "./KesimpulanModal";
 import PerjalananPasienModal from "./PerjalananPasienModal";
 import SuratKematianModal, { SuratKematianButton } from "./SuratKematianModal";
 import NotesModal from "./NotesModal";
-import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, StatusKeluarSelect, StatusKeluarBadge, NotePreview, NotesButton } from "../../components/OkqShared";
+import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, MeninggalSelect, MeninggalBadge, NotePreview, NotesButton } from "../../components/OkqShared";
 import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 
@@ -244,9 +244,9 @@ export default function OkQualityList() {
           />
         </div>
 
-        {/* Filter Status Keluar */}
-        <div className="w-60">
-          <StatusKeluarSelect
+        {/* Filter Pasien Meninggal */}
+        <div className="w-48">
+          <MeninggalSelect
             value={kodeKeluarFilter}
             onChange={setKodeKeluarFilter}
             className="py-2.5"
@@ -338,7 +338,7 @@ export default function OkQualityList() {
                         <div className="flex flex-col items-start gap-1">
                           <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
                           <JenisRawatBadge jenis={row.Jenis_Rawat} />
-                          <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                          <MeninggalBadge meninggal={row.Is_Meninggal} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -350,7 +350,7 @@ export default function OkQualityList() {
                             <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
                           )}
                           <SuratKematianButton
-                            kode={row.Kode_Keluar}
+                            meninggal={row.Is_Meninggal}
                             onClick={() => setSuratKematianModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
                           />
                           <button
@@ -417,7 +417,7 @@ export default function OkQualityList() {
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
                       <JenisRawatBadge jenis={row.Jenis_Rawat} />
-                      <StatusKeluarBadge kode={row.Kode_Keluar} ket={row.Ket_Keluar} />
+                      <MeninggalBadge meninggal={row.Is_Meninggal} />
                     </div>
                   </div>
                   <ProgressBar tahap={row.Tahap_Selesai} />
@@ -443,7 +443,7 @@ export default function OkQualityList() {
                         <NotesButton count={row.Notes_Count} size="md" onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })} />
                       )}
                       <SuratKematianButton
-                        kode={row.Kode_Keluar}
+                        meninggal={row.Is_Meninggal}
                         onClick={() => setSuratKematianModal({ noReg: row.No_Reg, nama: row.Nama_Pasien })}
                       />
                       <button

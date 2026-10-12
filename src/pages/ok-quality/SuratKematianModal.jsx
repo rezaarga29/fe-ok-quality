@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react";
 import { FileText, X, Loader2 } from "lucide-react";
 import { getSuratKematian } from "../../services/ok_quality.service";
-import { StatusKeluarBadge } from "../../components/OkqShared";
+import { MeninggalBadge, isPasienMeninggal } from "../../components/OkqShared";
 
 // ── Modal Surat Keterangan Kematian (read-only) ──────────────────────────────
 // Sumber: ASESMEN_SURATKET_KEMATIAN. Tombolnya hanya dimunculkan untuk pasien
-// keluar meninggal (Kode_Keluar A/B/C) — lihat isKodeMeninggal di bawah.
-
-export const KODE_MENINGGAL = ["A", "B", "C"];
-export const isKodeMeninggal = (kode) =>
-  KODE_MENINGGAL.includes(String(kode ?? "").trim().toUpperCase());
+// meninggal = No_Reg ada di ASESMEN_SURATKET_KEMATIAN (flag Is_Meninggal dari BE).
 
 // Tanggal dari BE sudah string "yyyy-mm-dd" (lokal, tanpa timezone)
 const fmtTanggalLokal = (s) => {
@@ -36,8 +32,8 @@ function InfoRow({ label, value, span = false }) {
 }
 
 // Tombol kecil untuk baris/kartu list — render null kalau bukan pasien meninggal
-export function SuratKematianButton({ kode, onClick, size = "md" }) {
-  if (!isKodeMeninggal(kode)) return null;
+export function SuratKematianButton({ meninggal, onClick, size = "md" }) {
+  if (!isPasienMeninggal(meninggal)) return null;
   const pad = size === "sm" ? "p-1.5" : "p-2";
   const icon = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
   return (
@@ -99,7 +95,7 @@ export default function SuratKematianModal({ noReg, namaPasien, onClose }) {
             </p>
           </div>
           {surat?.isMeninggal && (
-            <StatusKeluarBadge kode={surat.Kode_Keluar} ket={surat.Ket_Keluar} />
+            <MeninggalBadge meninggal={surat.isMeninggal} />
           )}
           <button
             onClick={onClose}
@@ -119,11 +115,11 @@ export default function SuratKematianModal({ noReg, namaPasien, onClose }) {
             <p className="text-sm text-red-500 text-center py-4">{error}</p>
           ) : !surat?.isMeninggal ? (
             <p className="text-sm text-gray-400 text-center py-4">
-              Pasien tidak tercatat keluar meninggal
+              Surat Keterangan Kematian tidak ditemukan untuk No. Reg ini
             </p>
           ) : records.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">
-              Pasien keluar meninggal, tetapi Surat Keterangan Kematian belum diisi
+              Surat Keterangan Kematian belum diisi
             </p>
           ) : (
             <div className="space-y-4">

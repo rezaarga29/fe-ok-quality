@@ -9,12 +9,6 @@ export async function getStats(params = {}) {
   return res.data;
 }
 
-// ── STATUS KELUAR (master M_PASIENCLOSING, untuk filter) ────────────────────
-export async function getStatusKeluar() {
-  const res = await axios.get(`${BASE}/status-keluar`, cfg);
-  return res.data;
-}
-
 // ── NOTES (role ok-quality-notes — hanya catatan milik user sendiri) ───────
 // params: { no_jadwal } atau { no_reg } (data lama tanpa No_Jadwal)
 export async function getNotes(params = {}) {
@@ -105,7 +99,7 @@ export async function getLembarTransferStatus(no_reg) {
 }
 
 // ── SURAT KETERANGAN KEMATIAN (referensi read-only, dari ASESMEN_SURATKET_KEMATIAN) ──
-// Hanya berisi record kalau pasien keluar meninggal (Kode_Keluar A/B/C)
+// isMeninggal = true kalau No_Reg ada di ASESMEN_SURATKET_KEMATIAN
 export async function getSuratKematian(no_reg) {
   const res = await axios.get(`${BASE}/surat-kematian/${no_reg}`, cfg);
   return res.data;
