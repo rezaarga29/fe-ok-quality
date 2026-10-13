@@ -415,14 +415,15 @@ export default function HomePage() {
   const [dpjpFilter,      setDpjpFilter]       = useState(savedFilters.dpjpFilter      ?? null);
   const [jenisRawatFilter, setJenisRawatFilter] = useState(savedFilters.jenisRawatFilter ?? "");
   const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter === "MENINGGAL" ? "MENINGGAL" : ""); // "" | "MENINGGAL"
+  const [notesFilter,     setNotesFilter]      = useState(["ada", "belum"].includes(savedFilters.notesFilter) ? savedFilters.notesFilter : ""); // "" | "ada" | "belum"
 
   // ── Simpan filter ke sessionStorage setiap kali berubah ──────────────────
   useEffect(() => {
     sessionStorage.setItem(FILTER_KEY, JSON.stringify({
       searchInput, activeSearch, statusFilter, tahapFilter,
-      penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter,
+      penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter,
     }));
-  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
+  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter]);
 
   // ── Load daftar dokter untuk filter DPJP ──────────────────────────────────
   useEffect(() => {
@@ -452,7 +453,8 @@ export default function HomePage() {
     ...(dpjpFilter?.value  && { dpjp: dpjpFilter.value }),
     ...(jenisRawatFilter   && { jenis_rawat: jenisRawatFilter }),
     ...(kodeKeluarFilter   && { kode_keluar: kodeKeluarFilter }),
-  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
+    ...(canNotes && notesFilter && { notes: notesFilter }),
+  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter, canNotes]);
 
   // ── Fetch stats — mengikuti filter aktif ─────────────────────────────────
   const fetchStats = useCallback(async (filterParams = {}) => {
@@ -511,11 +513,11 @@ export default function HomePage() {
   const resetFilters = () => {
     setSearchInput(""); setActiveSearch("");
     setStatusFilter(""); setTahapFilter("");
-    setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter("");
+    setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter(""); setNotesFilter("");
     setTanggalDari(threeMonthsAgo); setTanggalSampai(today);
   };
 
-  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai || dpjpFilter || jenisRawatFilter || kodeKeluarFilter;
+  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai || dpjpFilter || jenisRawatFilter || kodeKeluarFilter || (canNotes && notesFilter);
 
   if (authLoading) {
     return (
@@ -590,7 +592,7 @@ export default function HomePage() {
               Filter
               {hasActiveFilter && (
                 <span className="w-4 h-4 rounded-full bg-white text-[#2d6a4f] text-[10px] font-bold flex items-center justify-center">
-                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai, dpjpFilter?.value, jenisRawatFilter, kodeKeluarFilter].filter(Boolean).length}
+                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai, dpjpFilter?.value, jenisRawatFilter, kodeKeluarFilter, canNotes && notesFilter].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -679,7 +681,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 gap-3 ${canNotes ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
             {/* Status Pasien (meninggal) */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Pasien</label>
@@ -735,6 +737,24 @@ export default function HomePage() {
                 styles={dpjpSelectStyles}
               />
             </div>
+
+            {/* Notes (hanya user dengan akses notes — notes milik user sendiri) */}
+            {canNotes && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                  <StickyNote className="inline w-3.5 h-3.5 mr-1" />Notes
+                </label>
+                <select
+                  value={notesFilter}
+                  onChange={(e) => setNotesFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
+                >
+                  <option value="">— Semua —</option>
+                  <option value="ada">Sudah diberi notes</option>
+                  <option value="belum">Belum diberi notes</option>
+                </select>
+              </div>
+            )}
             </div>
 
             {/* Tanggal range */}
@@ -775,6 +795,7 @@ export default function HomePage() {
             {dpjpFilter         && <FilterPill label={`DPJP: ${dpjpFilter.label}`}                             onRemove={() => setDpjpFilter(null)} />}
             {jenisRawatFilter   && <FilterPill label={`Jenis Rawat: ${jenisRawatFilter}`}                      onRemove={() => setJenisRawatFilter("")} />}
             {kodeKeluarFilter   && <FilterPill label="Pasien Meninggal" onRemove={() => setKodeKeluarFilter("")} />}
+            {canNotes && notesFilter && <FilterPill label={notesFilter === "ada" ? "Sudah diberi notes" : "Belum diberi notes"} onRemove={() => setNotesFilter("")} />}
             {tanggalDari        && <FilterPill label={`Dari: ${tanggalDari}`}                                  onRemove={() => setTanggalDari("")} />}
             {tanggalSampai      && <FilterPill label={`Sampai: ${tanggalSampai}`}                              onRemove={() => setTanggalSampai("")} />}
           </div>
