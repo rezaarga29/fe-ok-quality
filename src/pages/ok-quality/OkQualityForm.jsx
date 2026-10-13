@@ -1288,6 +1288,7 @@ export default function OkQualityForm() {
     // Tahap 2
     Pendarahan: "",
     Perlengketan: "",
+    Kondisi_Luka_OK: "",
     Join_DPJP_Intra_Op: "",
     // Tahap 3
     GCS_After_E: "",
@@ -2562,6 +2563,16 @@ export default function OkQualityForm() {
                   onChange={(e) => set("Perlengketan", e.target.value)}
                   options={PERLENGKETAN_OPTIONS}
                   placeholder="— Pilih kondisi perlengketan —"
+                />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Kondisi Luka di Ruang Operasi">
+                <SelectInput
+                  value={form.Kondisi_Luka_OK}
+                  onChange={(e) => set("Kondisi_Luka_OK", e.target.value)}
+                  options={KONDISI_LUKA_OPTIONS}
+                  placeholder="— Pilih kondisi luka —"
                 />
               </Field>
             </div>

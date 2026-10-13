@@ -602,7 +602,7 @@ export default function OkQualityDetail() {
   const tahap1Empty =
     !data.Diagnosa && !data.Tindakan && !data.GCS_Before_E && !data.ASA;
   const tahap2Empty =
-    !data.Pendarahan && !data.Perlengketan && !data.Join_DPJP_Intra_Op;
+    !data.Pendarahan && !data.Perlengketan && !data.Kondisi_Luka_OK && !data.Join_DPJP_Intra_Op;
   const tahap3Empty =
     !hasGCSAfter && !hasVS && !data.Kondisi_Luka_RR && !data.Ruangan;
 
@@ -1169,6 +1169,10 @@ export default function OkQualityDetail() {
                 <div className="space-y-3">
                   <InfoRow label="Pendarahan" value={data.Pendarahan} />
                   <InfoRow label="Perlengketan" value={data.Perlengketan} />
+                  <InfoRow
+                    label="Kondisi Luka di Ruang Operasi"
+                    value={data.Kondisi_Luka_OK}
+                  />
                   <InfoRow
                     label="Join DPJP Intra OP"
                     value={data.Join_DPJP_Intra_Op}
