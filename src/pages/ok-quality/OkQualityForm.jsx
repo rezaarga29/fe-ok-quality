@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import Select from "react-select";
 import {
   ChevronRight,
@@ -24,6 +25,7 @@ import {
   Syringe,
   UserCheck,
   User,
+  Ban,
 } from "lucide-react";
 import {
   getById,
@@ -1069,6 +1071,7 @@ function TTVRecordCard({ data, onApply }) {
     { key: "TTV_HR",    label: "HR / Nadi (bpm)",     value: data.HR },
     { key: "TTV_Suhu",  label: "Suhu (°C)",           value: data.Suhu },
     { key: "TTV_RR",    label: "Respiratory Rate (x/menit)", value: data.RR },
+    { key: "TTV_SpO2",  label: "Saturasi O2 / SpO2 (%)", value: data.SpO2 },
   ];
   const hasAny = vsRows.some((r) => r.value !== null && r.value !== undefined && r.value !== "");
 
@@ -1103,6 +1106,7 @@ function TTVRecordCard({ data, onApply }) {
                   TTV_HR: data.HR ?? "",
                   TTV_Suhu: data.Suhu ?? "",
                   TTV_RR: data.RR ?? "",
+                  TTV_SpO2: data.SpO2 ?? "",
                 })
               }
               className="min-h-11 flex items-center px-3 -my-2 text-[11px] font-semibold text-[#2d6a4f] hover:text-[#1b4332] hover:bg-[#2d6a4f]/10 active:bg-[#2d6a4f]/20 rounded-lg underline underline-offset-2 transition-colors"
@@ -1193,7 +1197,16 @@ function ReferensiTTVModal({ records, onClose, onApply }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
+// Role staff-ranap hanya boleh mengisi Kondisi Luka di Ranap (lewat dashboard),
+// jadi tidak boleh membuka form penilaian lengkap.
 export default function OkQualityForm() {
+  const { isStaffRanap, loading } = useAuth();
+  if (loading) return null;
+  if (isStaffRanap) return <Navigate to="/home" replace />;
+  return <OkQualityFormContent />;
+}
+
+function OkQualityFormContent() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1281,6 +1294,7 @@ export default function OkQualityForm() {
     TTV_HR: "",
     TTV_Suhu: "",
     TTV_RR: "",
+    TTV_SpO2: "",
     Cara_Masuk: "",
     Asal_Pasien: "",
     Komplikasi: "", // "Ya" / "Tidak"
@@ -2008,6 +2022,7 @@ export default function OkQualityForm() {
                           TTV_HR: "",
                           TTV_Suhu: "",
                           TTV_RR: "",
+                          TTV_SpO2: "",
                           Cara_Masuk: "",
                           Asal_Pasien: "",
                         }));
@@ -2070,15 +2085,25 @@ export default function OkQualityForm() {
                       </p>
                     ) : (
                       <div className="border border-gray-100 rounded-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-gray-50">
-                        {jadwalRows.map((row) => (
+                        {jadwalRows.map((row) => {
+                          // Jadwal Status 'B' (Batal) tidak perlu dinilai
+                          const batal = !row.Id_Penilaian && (Number(row.Is_Batal) === 1 || String(row.JadwalStatus ?? "").trim().toUpperCase() === "B");
+                          return (
                           <button
                             key={row.No_Jadwal}
-                            onClick={() => handleJadwalPilih(row)}
-                            className="w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors group"
+                            onClick={() => !batal && handleJadwalPilih(row)}
+                            disabled={batal}
+                            title={batal ? "Jadwal dibatalkan, tidak perlu dinilai" : undefined}
+                            className={`w-full text-left px-4 py-3 transition-colors group ${batal ? "bg-gray-50 opacity-60 cursor-not-allowed" : "hover:bg-emerald-50"}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-sm font-semibold text-gray-800 group-hover:text-emerald-800 truncate">
                                 {row.Nama_Pasien || "—"}
+                                {batal && (
+                                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 align-middle">
+                                    <Ban className="w-3 h-3" /> Batal
+                                  </span>
+                                )}
                               </span>
                               <span className="text-xs text-gray-400 shrink-0">
                                 {row.Tanggal}
@@ -2099,7 +2124,8 @@ export default function OkQualityForm() {
                               </div>
                             )}
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     ))}
                 </>
@@ -2366,6 +2392,15 @@ export default function OkQualityForm() {
                 onChange={(e) => set("TTV_RR", e.target.value)}
                 autoFilled={filledFields.has("TTV_RR")}
                 placeholder="20"
+              />
+            </Field>
+            <Field label="Saturasi O2 / SpO2 (%)">
+              <Input
+                type="number"
+                value={form.TTV_SpO2}
+                onChange={(e) => set("TTV_SpO2", e.target.value)}
+                autoFilled={filledFields.has("TTV_SpO2")}
+                placeholder="98"
               />
             </Field>
           </Section>

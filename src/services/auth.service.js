@@ -27,6 +27,9 @@ export async function getSession() {
       is_doctor:      data.is_doctor      ?? false,
       can_kesimpulan: data.can_kesimpulan ?? false,
       can_notes:      data.can_notes      ?? false,
+      is_staff_ranap: data.is_staff_ranap ?? false, // role staff-ranap saja (hanya isi luka ranap)
+      can_luka_ranap: data.can_luka_ranap ?? false, // boleh isi Kondisi Luka di Ranap
+      has_staff_ranap: data.has_staff_ranap ?? false, // punya role staff-ranap (tombol Edit disembunyikan)
       expires_at:     data.expires_at,
     };
   } catch {

@@ -4,7 +4,7 @@ import {
   Sun, Sunrise, Moon, Eye, Pencil, Plus, RefreshCw,
   ClipboardList, CheckCircle2, Clock, AlertCircle, Loader2,
   Search, Filter, X, CalendarDays, ClipboardCheck, Timer,
-  ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, Stethoscope, BedDouble, Footprints, Route, StickyNote, HeartCrack, CircleHelp,
+  ChevronLeft, ChevronRight, Bandage, ThumbsUp, ThumbsDown, Stethoscope, BedDouble, Footprints, Route, StickyNote, HeartCrack, CircleHelp,
 } from "lucide-react";
 import Select from "react-select";
 import { useAuth } from "../../context/AuthContext";
@@ -14,6 +14,7 @@ import KesimpulanModal from "../ok-quality/KesimpulanModal";
 import PerjalananPasienModal from "../ok-quality/PerjalananPasienModal";
 import SuratKematianModal, { SuratKematianButton } from "../ok-quality/SuratKematianModal";
 import NotesModal from "../ok-quality/NotesModal";
+import LukaRanapModal, { LukaRanapBelumBadge } from "../ok-quality/LukaRanapModal";
 import { MeninggalBadge, MeninggalSelect, NotePreview, NotesButton } from "../../components/OkqShared";
 
 // ── Pagination ────────────────────────────────────────────────────────────────
@@ -202,7 +203,7 @@ function fmtDurasi(menit) {
 }
 
 // ── Patient card ──────────────────────────────────────────────────────────────
-function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratKematian, onNotes, canKesimpulan, canNotes }) {
+function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratKematian, onNotes, onLukaRanap, canKesimpulan, canNotes, isStaffRanap, canLukaRanap, hideEdit, showLukaRanapFlag }) {
   const nama     = row.Nama_Pasien ?? "-";
   const initials = nama.split(" ").slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
   const tanggal  = row.Tanggal
@@ -238,6 +239,11 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
       </div>
 
       <JourneySteps tahap={row.Tahap_Selesai} status={row.Status} />
+
+      {/* Penanda: kondisi luka di ranap setelah OP belum diisi (role staff-ranap) */}
+      {showLukaRanapFlag && (
+        <LukaRanapBelumBadge row={row} onClick={canLukaRanap ? () => onLukaRanap(row) : undefined} />
+      )}
 
       {/* Preview notes terakhir — hanya untuk user yang punya akses notes */}
       {canNotes && (
@@ -280,6 +286,16 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
           <button onClick={() => onView(row.Id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" title="Lihat detail">
             <Eye className="w-3.5 h-3.5" />
           </button>
+          {canLukaRanap && (
+          // Role staff-ranap boleh mengisi Kondisi Luka di Ranap, termasuk saat penilaian sudah selesai
+          <button
+            onClick={() => onLukaRanap(row)}
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+            title="Isi kondisi luka di ranap"
+          >
+            <Bandage className="w-3.5 h-3.5" />
+          </button>
+          )}{!hideEdit && (
           <button
             onClick={() => onEdit(row.Id)}
             disabled={!!row.Kesimpulan_Penilaian}
@@ -292,7 +308,8 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {row.Status === "selesai" && canKesimpulan && (
+          )}
+          {row.Status === "selesai" && canKesimpulan && !isStaffRanap && (
             <button
               onClick={() => onKesimpulan(row)}
               className="p-1.5 rounded-lg text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
@@ -375,7 +392,8 @@ const TAHAP_FILTER_OPTIONS = [
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, canKesimpulan, canNotes, loading: authLoading } = useAuth();
+  const { user, isAdmin, canKesimpulan, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap, loading: authLoading } = useAuth();
+  const canLukaRanap = canLukaRanapRole || isStaffRanap;
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
@@ -385,6 +403,7 @@ export default function HomePage() {
   const [showFilters,     setShowFilters]     = useState(false);
   const [pagination,      setPagination]      = useState({ page: 1, totalPages: 1, total: 0 });
   const [kesimpulanModal, setKesimpulanModal] = useState(null); // { id, nama, noReg }
+  const [lukaRanapModal,  setLukaRanapModal]  = useState(null); // { id, nama, noReg, value } — role staff-ranap
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
   const [suratKematianModal, setSuratKematianModal] = useState(null); // { noReg, nama }
   const [notesModal,      setNotesModal]      = useState(null); // { noJadwal, noReg, nama }
@@ -416,14 +435,15 @@ export default function HomePage() {
   const [jenisRawatFilter, setJenisRawatFilter] = useState(savedFilters.jenisRawatFilter ?? "");
   const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter === "MENINGGAL" ? "MENINGGAL" : ""); // "" | "MENINGGAL"
   const [notesFilter,     setNotesFilter]      = useState(["ada", "belum"].includes(savedFilters.notesFilter) ? savedFilters.notesFilter : ""); // "" | "ada" | "belum"
+  const [lukaRanapFilter, setLukaRanapFilter]  = useState(["belum", "sudah"].includes(savedFilters.lukaRanapFilter) ? savedFilters.lukaRanapFilter : ""); // "" | "belum" | "sudah"
 
   // ── Simpan filter ke sessionStorage setiap kali berubah ──────────────────
   useEffect(() => {
     sessionStorage.setItem(FILTER_KEY, JSON.stringify({
       searchInput, activeSearch, statusFilter, tahapFilter,
-      penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter,
+      penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter, lukaRanapFilter,
     }));
-  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter]);
+  }, [searchInput, activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter, lukaRanapFilter]);
 
   // ── Load daftar dokter untuk filter DPJP ──────────────────────────────────
   useEffect(() => {
@@ -454,7 +474,8 @@ export default function HomePage() {
     ...(jenisRawatFilter   && { jenis_rawat: jenisRawatFilter }),
     ...(kodeKeluarFilter   && { kode_keluar: kodeKeluarFilter }),
     ...(canNotes && notesFilter && { notes: notesFilter }),
-  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter, canNotes]);
+    ...(lukaRanapFilter    && { luka_ranap: lukaRanapFilter }),
+  }), [activeSearch, statusFilter, tahapFilter, penilaianFilter, tanggalDari, tanggalSampai, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, notesFilter, lukaRanapFilter, canNotes]);
 
   // ── Fetch stats — mengikuti filter aktif ─────────────────────────────────
   const fetchStats = useCallback(async (filterParams = {}) => {
@@ -513,11 +534,11 @@ export default function HomePage() {
   const resetFilters = () => {
     setSearchInput(""); setActiveSearch("");
     setStatusFilter(""); setTahapFilter("");
-    setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter(""); setNotesFilter("");
+    setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter(""); setNotesFilter(""); setLukaRanapFilter("");
     setTanggalDari(threeMonthsAgo); setTanggalSampai(today);
   };
 
-  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai || dpjpFilter || jenisRawatFilter || kodeKeluarFilter || (canNotes && notesFilter);
+  const hasActiveFilter = activeSearch || statusFilter || tahapFilter !== "" || penilaianFilter || tanggalDari || tanggalSampai || dpjpFilter || jenisRawatFilter || kodeKeluarFilter || (canNotes && notesFilter) || lukaRanapFilter;
 
   if (authLoading) {
     return (
@@ -592,10 +613,11 @@ export default function HomePage() {
               Filter
               {hasActiveFilter && (
                 <span className="w-4 h-4 rounded-full bg-white text-[#2d6a4f] text-[10px] font-bold flex items-center justify-center">
-                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai, dpjpFilter?.value, jenisRawatFilter, kodeKeluarFilter, canNotes && notesFilter].filter(Boolean).length}
+                  {[activeSearch, statusFilter, tahapFilter !== "" ? "1" : "", tanggalDari, tanggalSampai, dpjpFilter?.value, jenisRawatFilter, kodeKeluarFilter, canNotes && notesFilter, lukaRanapFilter].filter(Boolean).length}
                 </span>
               )}
             </button>
+            {!isStaffRanap && (
             <button
               onClick={() => navigate("/ok-quality/form")}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#2d6a4f] text-white font-semibold text-xs shadow hover:bg-[#1b4332] transition-colors"
@@ -603,6 +625,7 @@ export default function HomePage() {
               <Plus className="w-3.5 h-3.5" />
               Tambah
             </button>
+            )}
           </div>
         </div>
 
@@ -681,7 +704,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 gap-3 ${canNotes ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+            <div className={`grid grid-cols-1 gap-3 ${canNotes ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
             {/* Status Pasien (meninggal) */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Pasien</label>
@@ -702,6 +725,22 @@ export default function HomePage() {
                 {JENIS_RAWAT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Kondisi Luka di Ranap */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                <Bandage className="inline w-3.5 h-3.5 mr-1" />Kondisi Luka Ranap
+              </label>
+              <select
+                value={lukaRanapFilter}
+                onChange={(e) => setLukaRanapFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white"
+              >
+                <option value="">— Semua —</option>
+                <option value="belum">Belum diisi</option>
+                <option value="sudah">Sudah diisi</option>
               </select>
             </div>
 
@@ -795,6 +834,7 @@ export default function HomePage() {
             {dpjpFilter         && <FilterPill label={`DPJP: ${dpjpFilter.label}`}                             onRemove={() => setDpjpFilter(null)} />}
             {jenisRawatFilter   && <FilterPill label={`Jenis Rawat: ${jenisRawatFilter}`}                      onRemove={() => setJenisRawatFilter("")} />}
             {kodeKeluarFilter   && <FilterPill label="Pasien Meninggal" onRemove={() => setKodeKeluarFilter("")} />}
+            {lukaRanapFilter    && <FilterPill label={lukaRanapFilter === "belum" ? "Luka Ranap belum diisi" : "Luka Ranap sudah diisi"} onRemove={() => setLukaRanapFilter("")} />}
             {canNotes && notesFilter && <FilterPill label={notesFilter === "ada" ? "Sudah diberi notes" : "Belum diberi notes"} onRemove={() => setNotesFilter("")} />}
             {tanggalDari        && <FilterPill label={`Dari: ${tanggalDari}`}                                  onRemove={() => setTanggalDari("")} />}
             {tanggalSampai      && <FilterPill label={`Sampai: ${tanggalSampai}`}                              onRemove={() => setTanggalSampai("")} />}
@@ -817,7 +857,7 @@ export default function HomePage() {
               <button onClick={resetFilters} className="mt-3 text-xs text-[#2d6a4f] font-semibold hover:underline">
                 Reset filter
               </button>
-            ) : (
+            ) : !isStaffRanap && (
               <button
                 onClick={() => navigate("/ok-quality/form")}
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d6a4f] text-white font-semibold text-sm hover:bg-[#1b4332] transition-colors"
@@ -839,8 +879,13 @@ export default function HomePage() {
                   onPerjalanan={(r) => setPerjalananModal({ noReg: r.No_Reg, nama: r.Nama_Pasien })}
                   onSuratKematian={(r) => setSuratKematianModal({ noReg: r.No_Reg, nama: r.Nama_Pasien })}
                   onNotes={(r) => setNotesModal({ noJadwal: r.No_Jadwal, noReg: r.No_Reg, nama: r.Nama_Pasien })}
+                  onLukaRanap={(r) => setLukaRanapModal({ id: r.Id, nama: r.Nama_Pasien, noReg: r.No_Reg, value: r.Kondisi_Luka_Ranap })}
                   canNotes={canNotes}
                   canKesimpulan={canKesimpulan}
+                  isStaffRanap={isStaffRanap}
+                  canLukaRanap={canLukaRanap}
+                  hideEdit={isStaffRanap || hasStaffRanap}
+                  showLukaRanapFlag={canLukaRanap || isAdmin}
                 />
               ))}
             </div>
@@ -890,6 +935,18 @@ export default function HomePage() {
           noReg={notesModal.noReg}
           namaPasien={notesModal.nama}
           onClose={() => setNotesModal(null)}
+          onSaved={() => fetchData({ page: pagination.page, refresh: true })}
+        />
+      )}
+
+      {/* Kondisi Luka Ranap Modal (role staff-ranap) */}
+      {lukaRanapModal && (
+        <LukaRanapModal
+          penilaianId={lukaRanapModal.id}
+          nama={lukaRanapModal.nama}
+          noReg={lukaRanapModal.noReg}
+          initialValue={lukaRanapModal.value}
+          onClose={() => setLukaRanapModal(null)}
           onSaved={() => fetchData({ page: pagination.page, refresh: true })}
         />
       )}

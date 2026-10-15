@@ -9,6 +9,9 @@ export function AuthProvider({ children }) {
   const [isDoctor,      setIsDoctor]      = useState(false);
   const [canKesimpulan, setCanKesimpulan] = useState(false);
   const [canNotes,      setCanNotes]      = useState(false); // role ok-quality-notes
+  const [isStaffRanap,  setIsStaffRanap]  = useState(false); // role staff-ranap (hanya isi luka ranap)
+  const [canLukaRanap,  setCanLukaRanap]  = useState(false); // boleh isi luka ranap (staff-ranap / admin)
+  const [hasStaffRanap, setHasStaffRanap] = useState(false); // punya role staff-ranap → tombol Edit disembunyikan
   const [loading,       setLoading]       = useState(true);
 
   useEffect(() => { loadUser(); }, []);
@@ -21,9 +24,15 @@ export function AuthProvider({ children }) {
       setIsDoctor(session.is_doctor      ?? false);
       setCanKesimpulan(session.can_kesimpulan ?? false);
       setCanNotes(session.can_notes ?? false);
+      setIsStaffRanap(session.is_staff_ranap ?? false);
+      setCanLukaRanap(session.can_luka_ranap ?? session.is_staff_ranap ?? false);
+      setHasStaffRanap(session.has_staff_ranap ?? session.is_staff_ranap ?? false);
     } catch {
       setUser(null);
       setIsAdmin(false);
+      setIsStaffRanap(false);
+      setCanLukaRanap(false);
+      setHasStaffRanap(false);
     } finally {
       setLoading(false);
     }
@@ -35,10 +44,13 @@ export function AuthProvider({ children }) {
     setIsDoctor(false);
     setCanKesimpulan(false);
     setCanNotes(false);
+    setIsStaffRanap(false);
+    setCanLukaRanap(false);
+    setHasStaffRanap(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isDoctor, canKesimpulan, canNotes, loading, loadUser, clearUser }}>
+    <AuthContext.Provider value={{ user, isAdmin, isDoctor, canKesimpulan, canNotes, isStaffRanap, canLukaRanap, hasStaffRanap, loading, loadUser, clearUser }}>
       {children}
     </AuthContext.Provider>
   );

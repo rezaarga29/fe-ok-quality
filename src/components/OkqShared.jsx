@@ -74,6 +74,21 @@ export function MeninggalSelect({ value, onChange, className = "" }) {
   );
 }
 
+// ── Filter Kondisi Luka di Ranap ("" | "belum" | "sudah") ──────────────────
+export function LukaRanapSelect({ value, onChange, className = "" }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white ${className}`}
+    >
+      <option value="">— Semua Luka Ranap —</option>
+      <option value="belum">Luka Ranap belum diisi</option>
+      <option value="sudah">Luka Ranap sudah diisi</option>
+    </select>
+  );
+}
+
 // ── Preview notes terakhir (role notes) ──────────────────────────────────────
 // Teks dipotong di `max` karakter lalu diberi "…"; teks lengkap ada di
 // tooltip & di modal Notes (klik).
