@@ -392,7 +392,7 @@ const TAHAP_FILTER_OPTIONS = [
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user, isAdmin, canKesimpulan, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap, loading: authLoading } = useAuth();
+  const { user, isAdmin, canKesimpulan, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, loading: authLoading } = useAuth();
   // Tombol isi luka ranap: role staff-ranap ATAU admin
   const canLukaRanap = canLukaRanapRole || isStaffRanap || isAdmin;
   const greeting = getGreeting();
@@ -887,7 +887,7 @@ export default function HomePage() {
                   canKesimpulan={canKesimpulan}
                   isStaffRanap={isStaffRanap}
                   canLukaRanap={canLukaRanap}
-                  hideEdit={isStaffRanap || hasStaffRanap}
+                  hideEdit={isStaffRanap /* staff-ranap tanpa role admin/dokter */}
                   showLukaRanapFlag={canLukaRanap || isAdmin}
                 />
               ))}

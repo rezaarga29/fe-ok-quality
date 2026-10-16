@@ -516,9 +516,10 @@ function SuratKematianModal({ surat, onClose }) {
 export default function OkQualityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canKesimpulan: canKesimpulanRole, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap } = useAuth();
+  const { canKesimpulan: canKesimpulanRole, isStaffRanap, canLukaRanap: canLukaRanapRole } = useAuth();
   // Punya role staff-ranap → tombol Edit penilaian disembunyikan
-  const hideEdit = isStaffRanap || hasStaffRanap;
+  // isStaffRanap = role staff-ranap TANPA admin/dokter (admin & dokter tetap bisa edit)
+  const hideEdit = isStaffRanap;
   const canLukaRanap = canLukaRanapRole || isStaffRanap;
   // Staff ranap hanya boleh mengisi Kondisi Luka di Ranap — tanpa kesimpulan/edit
   const canKesimpulan = canKesimpulanRole && !isStaffRanap;
