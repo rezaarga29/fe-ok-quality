@@ -247,7 +247,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
 
       {/* Preview notes terakhir — hanya untuk user yang punya akses notes */}
       {canNotes && (
-        <NotePreview text={row.Last_Note} count={row.Notes_Count} onClick={() => onNotes(row)} />
+        <NotePreview text={row.Last_Note} author={row.Last_Note_User} count={row.Notes_Count} onClick={() => onNotes(row)} />
       )}
 
       {/* Kesimpulan badge — hanya tampil jika sudah ada kesimpulan */}
@@ -490,6 +490,7 @@ export default function HomePage() {
         kesimpulanBonamSanam: d.kesimpulan_bonam_sanam   || 0,
         kesimpulanMalam:      d.kesimpulan_malam         || 0,
         meninggal:            d.meninggal                || 0,
+        notesAda:             d.notes_ada ?? null,       // hanya untuk role notes (server-side)
       });
     } catch {
       // silent
@@ -599,6 +600,7 @@ export default function HomePage() {
             <h2 className="text-base font-bold text-gray-800">Perjalanan Operasi Pasien</h2>
             <p className="text-xs text-gray-400 mt-0.5">
               {pagination.total} data{hasActiveFilter ? " (terfilter)" : ""}
+              {canNotes && stats.notesAda != null && ` · ${stats.notesAda} sudah diberi notes`}
             </p>
           </div>
           <div className="flex items-center gap-2">

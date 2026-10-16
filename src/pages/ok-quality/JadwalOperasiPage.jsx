@@ -226,7 +226,10 @@ function Pagination({ pagination, limit = 20, onPage }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function JadwalOperasiPage() {
   const navigate = useNavigate();
-  const { canNotes, isStaffRanap } = useAuth();
+  const { canNotes, isStaffRanap: isStaffRanapOnly, hasStaffRanap } = useAuth();
+  // Siapa pun yang punya role staff-ranap tidak bisa Mulai / Lanjut penilaian
+  // (hanya bisa Lihat penilaian yang sudah ada)
+  const isStaffRanap = isStaffRanapOnly || hasStaffRanap;
   const today = new Date().toISOString().slice(0, 10);
 
   // ── Filter state ─────────────────────────────────────────────────────────────
@@ -242,6 +245,7 @@ export default function JadwalOperasiPage() {
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
   const [kodeKeluar, setKodeKeluar]   = useState("");   // "" | "MENINGGAL" (ASESMEN_SURATKET_KEMATIAN)
   const [notesModal, setNotesModal]   = useState(null); // { noJadwal, noReg, nama }
+  const [notesFilter, setNotesFilter] = useState("");   // "" | "ada" | "belum" (role notes, server-side)
 
   const LIMIT = 20;
 
@@ -250,6 +254,8 @@ export default function JadwalOperasiPage() {
   const [loading,    setLoading]      = useState(false);
   const [searched,   setSearched]     = useState(false);
   const [pagination, setPagination]   = useState({ page: 1, totalPages: 1, total: 0 });
+  // Ringkasan dari server — dihitung atas SELURUH hasil filter, bukan per halaman
+  const [summary,    setSummary]      = useState(null); // { belum_dinilai, selesai, batal, notes_ada? }
 
   // ── Fetch ─────────────────────────────────────────────────────────────────────
   const buildParams = useCallback((page = 1) => {
@@ -265,8 +271,9 @@ export default function JadwalOperasiPage() {
     if (dpjp?.value) params.dpjp = dpjp.value;
     if (jenisRawat) params.jenis_rawat = jenisRawat;
     if (kodeKeluar) params.kode_keluar = kodeKeluar;
+    if (canNotes && notesFilter) params.notes = notesFilter;
     return params;
-  }, [filterMode, tanggal, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar]);
+  }, [filterMode, tanggal, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar, notesFilter, canNotes]);
 
   const fetchPage = useCallback(async (page = 1) => {
     setLoading(true);
@@ -276,6 +283,7 @@ export default function JadwalOperasiPage() {
       const data = res.data || [];
       setRows(data);
       setPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+      setSummary(res.summary || null);
     } catch (err) {
       Swal.fire({
         icon: "error",
@@ -485,6 +493,22 @@ export default function JadwalOperasiPage() {
               <MeninggalSelect value={kodeKeluar} onChange={setKodeKeluar} />
             </div>
 
+            {/* Filter Notes (role notes — notes milik user sendiri, server-side) */}
+            {canNotes && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                <select
+                  value={notesFilter}
+                  onChange={(e) => setNotesFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] outline-none bg-white"
+                >
+                  <option value="">Semua</option>
+                  <option value="ada">Sudah diberi notes</option>
+                  <option value="belum">Belum diberi notes</option>
+                </select>
+              </div>
+            )}
+
             {/* Search teks */}
             <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-xs font-medium text-gray-500 mb-1">Cari No. MR / Nama Pasien / No. Reg</label>
@@ -543,10 +567,11 @@ export default function JadwalOperasiPage() {
                 ? `Total ${pagination.total} jadwal ditemukan`
                 : "Tidak ada jadwal ditemukan"}
             </span>
-            {displayRows.length > 0 && (
+            {summary && pagination.total > 0 && (
               <span className="text-gray-400">
-                {displayRows.filter((r) => !r.Id_Penilaian).length} belum dinilai ·{" "}
-                {displayRows.filter((r) => r.PenilaianStatus === "selesai").length} selesai (halaman ini)
+                {summary.belum_dinilai} belum dinilai · {summary.selesai} selesai
+                {summary.batal > 0 && <> · {summary.batal} batal</>}
+                {canNotes && summary.notes_ada != null && <> · {summary.notes_ada} sudah diberi notes</>}
               </span>
             )}
           </div>
@@ -646,7 +671,7 @@ export default function JadwalOperasiPage() {
                           </p>
                           {canNotes && (
                             <NotePreview
-                              text={row.Last_Note}
+                              text={row.Last_Note} author={row.Last_Note_User}
                               count={row.Notes_Count}
                               className="mt-1.5 max-w-[240px]"
                               onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -735,7 +760,7 @@ export default function JadwalOperasiPage() {
                     {/* Preview notes (role notes) */}
                     {canNotes && (
                       <NotePreview
-                        text={row.Last_Note}
+                        text={row.Last_Note} author={row.Last_Note_User}
                         count={row.Notes_Count}
                         className="mb-3"
                         onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}

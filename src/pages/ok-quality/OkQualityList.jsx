@@ -338,7 +338,7 @@ export default function OkQualityList() {
                         )}
                         {canNotes && (
                           <NotePreview
-                            text={row.Last_Note}
+                            text={row.Last_Note} author={row.Last_Note_User}
                             count={row.Notes_Count}
                             className="mt-1.5 max-w-xs"
                             onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -451,7 +451,7 @@ export default function OkQualityList() {
                   <ProgressBar tahap={row.Tahap_Selesai} />
                   {canNotes && (
                     <NotePreview
-                      text={row.Last_Note}
+                      text={row.Last_Note} author={row.Last_Note_User}
                       count={row.Notes_Count}
                       className="mt-2"
                       onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}

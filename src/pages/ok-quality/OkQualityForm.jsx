@@ -1200,9 +1200,9 @@ function ReferensiTTVModal({ records, onClose, onApply }) {
 // Role staff-ranap hanya boleh mengisi Kondisi Luka di Ranap (lewat dashboard),
 // jadi tidak boleh membuka form penilaian lengkap.
 export default function OkQualityForm() {
-  const { isStaffRanap, loading } = useAuth();
+  const { isStaffRanap, hasStaffRanap, loading } = useAuth();
   if (loading) return null;
-  if (isStaffRanap) return <Navigate to="/home" replace />;
+  if (isStaffRanap || hasStaffRanap) return <Navigate to="/home" replace />;
   return <OkQualityFormContent />;
 }
 
