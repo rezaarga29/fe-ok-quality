@@ -393,7 +393,8 @@ const TAHAP_FILTER_OPTIONS = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, isAdmin, canKesimpulan, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap, loading: authLoading } = useAuth();
-  const canLukaRanap = canLukaRanapRole || isStaffRanap;
+  // Tombol isi luka ranap: role staff-ranap ATAU admin
+  const canLukaRanap = canLukaRanapRole || isStaffRanap || isAdmin;
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
