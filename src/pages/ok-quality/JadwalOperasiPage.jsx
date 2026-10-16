@@ -226,10 +226,9 @@ function Pagination({ pagination, limit = 20, onPage }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function JadwalOperasiPage() {
   const navigate = useNavigate();
-  const { canNotes, isStaffRanap: isStaffRanapOnly, hasStaffRanap } = useAuth();
-  // Siapa pun yang punya role staff-ranap tidak bisa Mulai / Lanjut penilaian
-  // (hanya bisa Lihat penilaian yang sudah ada)
-  const isStaffRanap = isStaffRanapOnly || hasStaffRanap;
+  // isStaffRanap = role staff-ranap TANPA admin/dokter → tidak bisa Mulai /
+  // Lanjut (hanya Lihat). Admin & dokter tetap bisa Mulai / Lanjut / Edit.
+  const { canNotes, isStaffRanap } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
 
   // ── Filter state ─────────────────────────────────────────────────────────────

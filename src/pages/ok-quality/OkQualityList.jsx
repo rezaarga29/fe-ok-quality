@@ -145,9 +145,10 @@ function Pagination({ pagination, onPage }) {
 
 export default function OkQualityList() {
   const navigate = useNavigate();
-  const { canKesimpulan: canKesimpulanRole, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap } = useAuth();
+  const { canKesimpulan: canKesimpulanRole, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole } = useAuth();
   // Punya role staff-ranap → tombol Edit penilaian disembunyikan
-  const hideEdit = isStaffRanap || hasStaffRanap;
+  // isStaffRanap = role staff-ranap TANPA admin/dokter (admin & dokter tetap bisa edit)
+  const hideEdit = isStaffRanap;
   const canLukaRanap = canLukaRanapRole || isStaffRanap;
   // Staff ranap hanya boleh mengisi Kondisi Luka di Ranap
   const canKesimpulan = canKesimpulanRole && !isStaffRanap;
