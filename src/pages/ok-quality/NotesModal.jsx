@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { StickyNote, X, Loader2, Send, Clock } from "lucide-react";
+import { StickyNote, X, Loader2, Send, Clock, User } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 import { getNotes, createNote } from "../../services/ok_quality.service";
 
 // ── Modal Notes per jadwal operasi (role ok-quality-notes) ───────────────────
-// User bisa menulis catatan baru dan melihat riwayat catatan yang IA tulis
-// sendiri untuk jadwal ini (BE memfilter berdasarkan user login).
+// User bisa menulis catatan baru dan melihat riwayat catatan dari SEMUA user
+// untuk jadwal ini, lengkap dengan nama pemberi notes.
 // Kunci: No_Jadwal; data lama tanpa No_Jadwal memakai No_Reg.
 
 const MAX_LEN = 4000;
@@ -29,6 +30,8 @@ export default function NotesModal({ noJadwal, noReg, namaPasien, onClose, onSav
   const [error, setError]     = useState(null);
   const [text, setText]       = useState("");
   const [saving, setSaving]   = useState(false);
+  const { user } = useAuth();
+  const myUsername = user?.preferred_username || user?.name || null;
 
   const params = noJadwal ? { no_jadwal: noJadwal } : { no_reg: noReg };
 
@@ -136,7 +139,7 @@ export default function NotesModal({ noJadwal, noReg, namaPasien, onClose, onSav
         {/* Riwayat notes milik user */}
         <div className="px-6 py-4 overflow-y-auto">
           <p className="text-xs font-semibold text-gray-500 mb-3">
-            Catatan saya {!loading && !error && `(${notes.length})`}
+            Semua catatan {!loading && !error && `(${notes.length})`}
           </p>
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
@@ -149,15 +152,25 @@ export default function NotesModal({ noJadwal, noReg, namaPasien, onClose, onSav
             <p className="text-sm text-gray-400 text-center py-6">Belum ada catatan.</p>
           ) : (
             <ul className="space-y-2.5">
-              {notes.map((n) => (
-                <li key={n.Id} className="rounded-xl border border-yellow-100 bg-yellow-50/50 px-4 py-3">
+              {notes.map((n) => {
+                const isMine = myUsername && n.NamaUser === myUsername;
+                return (
+                <li key={n.Id} className={`rounded-xl border px-4 py-3 ${isMine ? "border-yellow-200 bg-yellow-50" : "border-gray-100 bg-gray-50/70"}`}>
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 mb-1">
+                    <User className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{n.Nama_Lengkap || n.NamaUser || "-"}</span>
+                    {isMine && (
+                      <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-200 text-yellow-800">Saya</span>
+                    )}
+                  </p>
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{n.Catatan}</p>
                   <p className="flex items-center gap-1 text-[11px] text-gray-400 mt-1.5">
                     <Clock className="w-3 h-3" />
                     {fmtWib(n.Tgl_Input)}
                   </p>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

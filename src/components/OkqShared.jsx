@@ -74,6 +74,21 @@ export function MeninggalSelect({ value, onChange, className = "" }) {
   );
 }
 
+// ── Filter Kondisi Luka di Ranap ("" | "belum" | "sudah") ──────────────────
+export function LukaRanapSelect({ value, onChange, className = "" }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white ${className}`}
+    >
+      <option value="">— Semua Luka Ranap —</option>
+      <option value="belum">Luka Ranap belum diisi</option>
+      <option value="sudah">Luka Ranap sudah diisi</option>
+    </select>
+  );
+}
+
 // ── Preview notes terakhir (role notes) ──────────────────────────────────────
 // Teks dipotong di `max` karakter lalu diberi "…"; teks lengkap ada di
 // tooltip & di modal Notes (klik).
@@ -84,17 +99,18 @@ export function truncateText(text, max = NOTE_PREVIEW_MAX) {
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
 }
 
-export function NotePreview({ text, count, onClick, max = NOTE_PREVIEW_MAX, className = "" }) {
+export function NotePreview({ text, count, author, onClick, max = NOTE_PREVIEW_MAX, className = "" }) {
   if (!text || !(count > 0)) return null;
   return (
     <button
       type="button"
       onClick={onClick}
-      title={text}
+      title={author ? `${author}: ${text}` : text}
       className={`w-full flex items-start gap-1.5 px-3 py-2 rounded-xl bg-yellow-50 border border-yellow-200 text-left hover:bg-yellow-100 transition-colors ${className}`}
     >
       <StickyNote className="w-3.5 h-3.5 text-yellow-600 shrink-0 mt-0.5" />
       <span className="flex-1 min-w-0 text-[11px] text-gray-700 leading-snug break-words">
+        {author && <strong className="font-semibold text-gray-800">{author}: </strong>}
         {truncateText(text, max)}
       </span>
       {count > 1 && (

@@ -117,6 +117,12 @@ export async function updateTahap(id, tahap, data) {
   return res.data;
 }
 
+// ── KONDISI LUKA RANAP — satu-satunya field yang boleh diisi role staff-ranap ─
+export async function updateLukaRanap(id, Kondisi_Luka_Ranap) {
+  const res = await axios.patch(`${BASE}/${id}/luka-ranap`, { Kondisi_Luka_Ranap }, cfg);
+  return res.data;
+}
+
 // ── UPDATE FULL ─────────────────────────────────────────────────────────────
 export async function update(id, data) {
   const res = await axios.put(`${BASE}/${id}`, data, cfg);

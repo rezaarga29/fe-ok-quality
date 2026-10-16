@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Pencil,
+  Bandage,
   Loader2,
   CheckCircle2,
   Clock,
@@ -38,6 +39,7 @@ import { MeninggalBadge, isPasienMeninggal } from "../../components/OkqShared";
 import { getPenandaan } from "../../services/penandaan_lokasi.service";
 import { useAuth } from "../../context/AuthContext";
 import KesimpulanModal from "./KesimpulanModal";
+import LukaRanapModal from "./LukaRanapModal";
 import Swal from "sweetalert2";
 
 // ── Journey stepper ───────────────────────────────────────────────────────────
@@ -228,7 +230,7 @@ function GCSPanel({ e, m, v, label, color }) {
 }
 
 // ── Vitals panel (side-by-side) ───────────────────────────────────────────────
-function VitalsPanel({ td, tdper, hr, suhu, rr, label, color, showRR }) {
+function VitalsPanel({ td, tdper, hr, suhu, rr, spo2, label, color, showRR }) {
   return (
     <div className="flex flex-col gap-2">
       <p
@@ -242,6 +244,7 @@ function VitalsPanel({ td, tdper, hr, suhu, rr, label, color, showRR }) {
         <VitalBox label={showRR ? "Nadi" : "HR/Nadi"} value={hr} unit="bpm" />
         <VitalBox label="Suhu" value={suhu} unit="°C" />
         {showRR && <VitalBox label="Respiratory Rate" value={rr} unit="x/m" />}
+        {showRR && <VitalBox label="SpO2" value={spo2} unit="%" />}
       </div>
     </div>
   );
@@ -513,7 +516,13 @@ function SuratKematianModal({ surat, onClose }) {
 export default function OkQualityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canKesimpulan } = useAuth();
+  const { canKesimpulan: canKesimpulanRole, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap } = useAuth();
+  // Punya role staff-ranap → tombol Edit penilaian disembunyikan
+  const hideEdit = isStaffRanap || hasStaffRanap;
+  const canLukaRanap = canLukaRanapRole || isStaffRanap;
+  // Staff ranap hanya boleh mengisi Kondisi Luka di Ranap — tanpa kesimpulan/edit
+  const canKesimpulan = canKesimpulanRole && !isStaffRanap;
+  const [showLukaRanapModal, setShowLukaRanapModal] = useState(false);
   const [data, setData] = useState(null);
   const [kesimpulan, setKesimpulan] = useState(null);
   const [penandaan, setPenandaan] = useState(null);
@@ -595,7 +604,7 @@ export default function OkQualityDetail() {
   const hasGCSAfter = data.GCS_After_E || data.GCS_After_M || data.GCS_After_V;
   const hasGCS = hasGCSBefore || hasGCSAfter;
 
-  const hasTTV = data.TTV_TD || data.TTV_HR || data.TTV_Suhu || data.TTV_RR;
+  const hasTTV = data.TTV_TD || data.TTV_HR || data.TTV_Suhu || data.TTV_RR || data.TTV_SpO2;
   const hasVS = data.VS_TD || data.VS_Nadi || data.VS_Suhu;
   const hasVitals = hasTTV || hasVS;
 
@@ -651,6 +660,15 @@ export default function OkQualityDetail() {
               {kesimpulan ? "Edit Kesimpulan" : "Beri Kesimpulan"}
             </button>
           )}
+          {canLukaRanap && (
+            <button
+              onClick={() => setShowLukaRanapModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
+            >
+              <Bandage className="w-3.5 h-3.5" />
+              Isi Luka Ranap
+            </button>
+          )}{!hideEdit && (
           <button
             onClick={() => navigate(`/ok-quality/form/${id}`)}
             disabled={!!kesimpulan}
@@ -664,6 +682,7 @@ export default function OkQualityDetail() {
             <Pencil className="w-3.5 h-3.5" />
             Edit
           </button>
+          )}
         </div>
       </div>
 
@@ -1032,6 +1051,7 @@ export default function OkQualityDetail() {
                   hr={data.TTV_HR}
                   suhu={data.TTV_Suhu}
                   rr={data.TTV_RR}
+                  spo2={data.TTV_SpO2}
                   label="Tanda Vital Sebelum Operasi"
                   color="text-sky-500"
                   showRR={true}
@@ -1054,6 +1074,7 @@ export default function OkQualityDetail() {
                   hr={data.VS_Nadi}
                   suhu={data.VS_Suhu}
                   rr={data.VS_RR}
+                  spo2={data.VS_SpO2}
                   label="Tanda Vital Sesudah Operasi"
                   color="text-emerald-600"
                   showRR={true}
@@ -1255,6 +1276,15 @@ export default function OkQualityDetail() {
             {kesimpulan ? "Edit Kesimpulan" : "Beri Kesimpulan"}
           </button>
         )}
+        {canLukaRanap && (
+          <button
+            onClick={() => setShowLukaRanapModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2d6a4f] text-white text-sm font-semibold hover:bg-[#1b4332] transition-colors shadow"
+          >
+            <Bandage className="w-4 h-4" />
+            Isi Kondisi Luka di Ranap
+          </button>
+        )}{!hideEdit && (
         <button
           onClick={() => navigate(`/ok-quality/form/${id}`)}
           disabled={!!kesimpulan}
@@ -1268,9 +1298,25 @@ export default function OkQualityDetail() {
           <Pencil className="w-4 h-4" />
           Edit Penilaian
         </button>
+        )}
       </div>
 
       {/* Modal Kesimpulan */}
+      {showLukaRanapModal && (
+        <LukaRanapModal
+          penilaianId={parseInt(id)}
+          nama={data.Nama_Pasien}
+          noReg={data.No_Reg}
+          initialValue={data.Kondisi_Luka_Ranap}
+          onClose={() => setShowLukaRanapModal(false)}
+          onSaved={() =>
+            getById(id)
+              .then((r) => setData((prev) => ({ ...prev, ...(r.data || {}) })))
+              .catch(() => {})
+          }
+        />
+      )}
+
       {showKesimpulanModal && (
         <KesimpulanModal
           penilaianId={parseInt(id)}

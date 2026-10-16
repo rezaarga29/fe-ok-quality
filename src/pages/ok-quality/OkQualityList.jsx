@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck, ChevronLeft, ChevronRight, Route, Stethoscope, X, StickyNote } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Loader2, CheckCircle2, Clock, AlertCircle, ClipboardCheck, ChevronLeft, ChevronRight, Route, Stethoscope, X, StickyNote, Bandage } from "lucide-react";
 import { getAll } from "../../services/ok_quality.service";
 import KesimpulanModal from "./KesimpulanModal";
+import LukaRanapModal from "./LukaRanapModal";
 import PerjalananPasienModal from "./PerjalananPasienModal";
 import SuratKematianModal, { SuratKematianButton } from "./SuratKematianModal";
 import NotesModal from "./NotesModal";
-import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, MeninggalSelect, MeninggalBadge, NotePreview, NotesButton } from "../../components/OkqShared";
+import { DpjpSelect, JenisRawatSelect, JenisRawatBadge, MeninggalSelect, MeninggalBadge, LukaRanapSelect, NotePreview, NotesButton } from "../../components/OkqShared";
 import { useAuth } from "../../context/AuthContext";
 import Swal from "sweetalert2";
 
@@ -144,7 +145,13 @@ function Pagination({ pagination, onPage }) {
 
 export default function OkQualityList() {
   const navigate = useNavigate();
-  const { canKesimpulan, canNotes } = useAuth();
+  const { canKesimpulan: canKesimpulanRole, canNotes, isStaffRanap, canLukaRanap: canLukaRanapRole, hasStaffRanap } = useAuth();
+  // Punya role staff-ranap → tombol Edit penilaian disembunyikan
+  const hideEdit = isStaffRanap || hasStaffRanap;
+  const canLukaRanap = canLukaRanapRole || isStaffRanap;
+  // Staff ranap hanya boleh mengisi Kondisi Luka di Ranap
+  const canKesimpulan = canKesimpulanRole && !isStaffRanap;
+  const [lukaRanapModal, setLukaRanapModal] = useState(null); // { id, nama, noReg, value }
   const [data, setData]                       = useState([]);
   const [kesimpulanModal, setKesimpulanModal] = useState(null);
   const [loading, setLoading]                 = useState(true);
@@ -156,6 +163,7 @@ export default function OkQualityList() {
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
   const [suratKematianModal, setSuratKematianModal] = useState(null); // { noReg, nama }
   const [kodeKeluarFilter, setKodeKeluarFilter] = useState("");
+  const [lukaRanapFilter, setLukaRanapFilter]   = useState(""); // "" | "belum" | "sudah"
   const [notesModal, setNotesModal]           = useState(null); // { noJadwal, noReg, nama }
   const [pagination, setPagination]           = useState({ page: 1, totalPages: 1, total: 0 });
 
@@ -169,6 +177,7 @@ export default function OkQualityList() {
         ...(dpjpFilter?.value && { dpjp: dpjpFilter.value }),
         ...(jenisRawatFilter && { jenis_rawat: jenisRawatFilter }),
         ...(kodeKeluarFilter && { kode_keluar: kodeKeluarFilter }),
+        ...(lukaRanapFilter  && { luka_ranap: lukaRanapFilter }),
       });
       setData(res.data || []);
       setPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
@@ -177,7 +186,7 @@ export default function OkQualityList() {
     } finally {
       setLoading(false);
     }
-  }, [search, penilaianFilter, dpjpFilter, jenisRawatFilter, kodeKeluarFilter]);
+  }, [search, penilaianFilter, dpjpFilter, jenisRawatFilter, kodeKeluarFilter, lukaRanapFilter]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
@@ -194,13 +203,13 @@ export default function OkQualityList() {
           <h1 className="text-xl sm:text-2xl font-extrabold text-gray-800">Penilaian OK Quality</h1>
           <p className="text-sm text-gray-500 mt-0.5">{pagination.total} data tersedia</p>
         </div>
-        <button
+        {!isStaffRanap && <button
           onClick={() => navigate("/ok-quality/form")}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2d6a4f] text-white font-semibold text-sm shadow-md hover:bg-[#1b4332] transition-colors"
         >
           <Plus className="w-4 h-4" />
           Tambah Penilaian
-        </button>
+        </button>}
       </div>
 
       {/* Search + Filter Penilaian */}
@@ -253,16 +262,25 @@ export default function OkQualityList() {
           />
         </div>
 
+        {/* Filter Kondisi Luka di Ranap */}
+        <div className="w-52">
+          <LukaRanapSelect
+            value={lukaRanapFilter}
+            onChange={setLukaRanapFilter}
+            className="py-2.5"
+          />
+        </div>
+
         {/* Filter DPJP */}
         <div className="w-full sm:w-72">
           <DpjpSelect value={dpjpFilter} onChange={setDpjpFilter} />
         </div>
 
-        {(search || penilaianFilter || dpjpFilter || jenisRawatFilter || kodeKeluarFilter) && (
+        {(search || penilaianFilter || dpjpFilter || jenisRawatFilter || kodeKeluarFilter || lukaRanapFilter) && (
           <button
             onClick={() => {
               setSearch(""); setSearchInput("");
-              setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter("");
+              setPenilaianFilter(""); setDpjpFilter(null); setJenisRawatFilter(""); setKodeKeluarFilter(""); setLukaRanapFilter("");
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 hover:text-red-500 transition-colors"
           >
@@ -320,7 +338,7 @@ export default function OkQualityList() {
                         )}
                         {canNotes && (
                           <NotePreview
-                            text={row.Last_Note}
+                            text={row.Last_Note} author={row.Last_Note_User}
                             count={row.Notes_Count}
                             className="mt-1.5 max-w-xs"
                             onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -367,6 +385,15 @@ export default function OkQualityList() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          {canLukaRanap && (
+                            <button
+                              onClick={() => setLukaRanapModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg, value: row.Kondisi_Luka_Ranap })}
+                              className="p-2 rounded-lg text-gray-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                              title="Isi kondisi luka di ranap"
+                            >
+                              <Bandage className="w-4 h-4" />
+                            </button>
+                          )}{!hideEdit && (
                           <button
                             onClick={() => navigate(`/ok-quality/form/${row.Id}`)}
                             disabled={!!row.Kesimpulan_Penilaian}
@@ -379,6 +406,7 @@ export default function OkQualityList() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
+                          )}
                           {row.Status === "selesai" && canKesimpulan && (
                             <button
                               onClick={() => setKesimpulanModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg })}
@@ -423,7 +451,7 @@ export default function OkQualityList() {
                   <ProgressBar tahap={row.Tahap_Selesai} />
                   {canNotes && (
                     <NotePreview
-                      text={row.Last_Note}
+                      text={row.Last_Note} author={row.Last_Note_User}
                       count={row.Notes_Count}
                       className="mt-2"
                       onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -459,6 +487,15 @@ export default function OkQualityList() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {canLukaRanap && (
+                        <button
+                          onClick={() => setLukaRanapModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg, value: row.Kondisi_Luka_Ranap })}
+                          className="p-1.5 rounded-lg text-gray-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="Isi kondisi luka di ranap"
+                        >
+                          <Bandage className="w-4 h-4" />
+                        </button>
+                      )}{!hideEdit && (
                       <button
                         onClick={() => navigate(`/ok-quality/form/${row.Id}`)}
                         disabled={!!row.Kesimpulan_Penilaian}
@@ -471,6 +508,7 @@ export default function OkQualityList() {
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
+                      )}
                       {row.Status === "selesai" && canKesimpulan && (
                         <button
                           onClick={() => setKesimpulanModal({ id: row.Id, nama: row.Nama_Pasien, noReg: row.No_Reg })}
@@ -519,6 +557,17 @@ export default function OkQualityList() {
       )}
 
       {/* Kesimpulan Modal */}
+      {lukaRanapModal && (
+        <LukaRanapModal
+          penilaianId={lukaRanapModal.id}
+          nama={lukaRanapModal.nama}
+          noReg={lukaRanapModal.noReg}
+          initialValue={lukaRanapModal.value}
+          onClose={() => setLukaRanapModal(null)}
+          onSaved={() => fetchData(pagination.page)}
+        />
+      )}
+
       {kesimpulanModal && (
         <KesimpulanModal
           penilaianId={kesimpulanModal.id}

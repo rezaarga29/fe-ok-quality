@@ -18,6 +18,8 @@ import {
   ClipboardList,
   Route,
   StickyNote,
+  Ban,
+  Eye,
 } from "lucide-react";
 import { getJadwal } from "../../services/ok_quality.service";
 import PerjalananPasienModal from "./PerjalananPasienModal";
@@ -35,7 +37,20 @@ const BULAN_NAMES = [
 
 const TAHAP_LABEL = ["Sebelum OP", "Sebelum OP", "Waktu OP", "Sesudah OP"];
 
+// JADWAL_OPERASI.Status = 'B' → jadwal dibatalkan, tidak perlu dinilai
+function isJadwalBatal(row) {
+  return Number(row?.Is_Batal) === 1 || String(row?.JadwalStatus ?? "").trim().toUpperCase() === "B";
+}
+
 function stepInfo(row) {
+  if (!row.Id_Penilaian && isJadwalBatal(row)) {
+    return {
+      text: "Batal",
+      sub: "Jadwal dibatalkan — tidak perlu dinilai",
+      color: "red",
+      icon: Ban,
+    };
+  }
   if (!row.Id_Penilaian) {
     return {
       text: "Belum Dinilai",
@@ -76,7 +91,41 @@ const colorMap = {
   green: { badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
   blue:  { badge: "bg-blue-100 text-blue-700",       dot: "bg-blue-500"    },
   amber: { badge: "bg-amber-100 text-amber-700",     dot: "bg-amber-500"   },
+  red:   { badge: "bg-red-100 text-red-700",         dot: "bg-red-500"     },
 };
+
+// Tombol aksi per baris jadwal:
+//   batal   → jadwal Status 'B' & belum ada penilaian → disabled
+//   locked  → role staff-ranap, belum ada penilaian → disabled
+//   lihat   → role staff-ranap, sudah ada penilaian → buka detail
+//   selesai / lanjut / mulai → alur normal
+function actionKind(row, isStaffRanap) {
+  const hasPenilaian = !!row.Id_Penilaian;
+  if (!hasPenilaian && isJadwalBatal(row)) return "batal";
+  if (isStaffRanap) return hasPenilaian ? "lihat" : "locked";
+  if (row.PenilaianStatus === "selesai") return "selesai";
+  return hasPenilaian ? "lanjut" : "mulai";
+}
+
+const ACTION_STYLE = {
+  batal:   "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed",
+  locked:  "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed",
+  lihat:   "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200",
+  selesai: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200",
+  lanjut:  "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200",
+  mulai:   "bg-[#2d6a4f] text-white hover:bg-[#1b4332] shadow-sm",
+};
+
+function ActionLabel({ kind, full = false, iconClass = "w-3.5 h-3.5" }) {
+  switch (kind) {
+    case "batal":   return <><Ban className={iconClass} /> {full ? "Jadwal Batal" : "Batal"}</>;
+    case "locked":  return <><CircleDashed className={iconClass} /> Belum Dinilai</>;
+    case "lihat":   return <><Eye className={iconClass} /> {full ? "Lihat Penilaian" : "Lihat"}</>;
+    case "selesai": return <><CheckCircle2 className={iconClass} /> {full ? "Lihat Penilaian" : "Lihat"}</>;
+    case "lanjut":  return <><Clock className={iconClass} /> {full ? "Lanjut Penilaian" : "Lanjut"}</>;
+    default:        return <><ClipboardPlus className={iconClass} /> {full ? "Mulai Penilaian" : "Mulai"}</>;
+  }
+}
 
 function StepBadge({ row }) {
   const { text, sub, color, icon: Icon } = stepInfo(row);
@@ -177,7 +226,10 @@ function Pagination({ pagination, limit = 20, onPage }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function JadwalOperasiPage() {
   const navigate = useNavigate();
-  const { canNotes } = useAuth();
+  const { canNotes, isStaffRanap: isStaffRanapOnly, hasStaffRanap } = useAuth();
+  // Siapa pun yang punya role staff-ranap tidak bisa Mulai / Lanjut penilaian
+  // (hanya bisa Lihat penilaian yang sudah ada)
+  const isStaffRanap = isStaffRanapOnly || hasStaffRanap;
   const today = new Date().toISOString().slice(0, 10);
 
   // ── Filter state ─────────────────────────────────────────────────────────────
@@ -193,6 +245,7 @@ export default function JadwalOperasiPage() {
   const [perjalananModal, setPerjalananModal] = useState(null); // { noReg, nama }
   const [kodeKeluar, setKodeKeluar]   = useState("");   // "" | "MENINGGAL" (ASESMEN_SURATKET_KEMATIAN)
   const [notesModal, setNotesModal]   = useState(null); // { noJadwal, noReg, nama }
+  const [notesFilter, setNotesFilter] = useState("");   // "" | "ada" | "belum" (role notes, server-side)
 
   const LIMIT = 20;
 
@@ -201,6 +254,8 @@ export default function JadwalOperasiPage() {
   const [loading,    setLoading]      = useState(false);
   const [searched,   setSearched]     = useState(false);
   const [pagination, setPagination]   = useState({ page: 1, totalPages: 1, total: 0 });
+  // Ringkasan dari server — dihitung atas SELURUH hasil filter, bukan per halaman
+  const [summary,    setSummary]      = useState(null); // { belum_dinilai, selesai, batal, notes_ada? }
 
   // ── Fetch ─────────────────────────────────────────────────────────────────────
   const buildParams = useCallback((page = 1) => {
@@ -216,8 +271,9 @@ export default function JadwalOperasiPage() {
     if (dpjp?.value) params.dpjp = dpjp.value;
     if (jenisRawat) params.jenis_rawat = jenisRawat;
     if (kodeKeluar) params.kode_keluar = kodeKeluar;
+    if (canNotes && notesFilter) params.notes = notesFilter;
     return params;
-  }, [filterMode, tanggal, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar]);
+  }, [filterMode, tanggal, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar, notesFilter, canNotes]);
 
   const fetchPage = useCallback(async (page = 1) => {
     setLoading(true);
@@ -227,6 +283,7 @@ export default function JadwalOperasiPage() {
       const data = res.data || [];
       setRows(data);
       setPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+      setSummary(res.summary || null);
     } catch (err) {
       Swal.fire({
         icon: "error",
@@ -250,9 +307,12 @@ export default function JadwalOperasiPage() {
 
   // ── Navigasi ke form ──────────────────────────────────────────────────────────
   const handleMulai = (row) => {
+    const kind = actionKind(row, isStaffRanap);
+    // Jadwal batal tidak perlu dinilai; staff ranap tidak bisa membuat penilaian
+    if (kind === "batal" || kind === "locked") return;
     // Jika sudah ada penilaian, arahkan ke form edit
     if (row.Id_Penilaian) {
-      if (row.PenilaianStatus === "selesai") {
+      if (row.PenilaianStatus === "selesai" || kind === "lihat") {
         navigate(`/ok-quality/${row.Id_Penilaian}`, {
           state: { activeMenu: "/jadwal-operasi" },
         });
@@ -411,6 +471,7 @@ export default function JadwalOperasiPage() {
                 <option value="2">Tahap 2 Selesai</option>
                 <option value="3">Tahap 3 Selesai</option>
                 <option value="selesai">Penilaian Selesai</option>
+                <option value="batal">Jadwal Batal</option>
               </select>
             </div>
 
@@ -431,6 +492,22 @@ export default function JadwalOperasiPage() {
               <label className="block text-xs font-medium text-gray-500 mb-1">Status Pasien</label>
               <MeninggalSelect value={kodeKeluar} onChange={setKodeKeluar} />
             </div>
+
+            {/* Filter Notes (role notes — notes milik user sendiri, server-side) */}
+            {canNotes && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                <select
+                  value={notesFilter}
+                  onChange={(e) => setNotesFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] outline-none bg-white"
+                >
+                  <option value="">Semua</option>
+                  <option value="ada">Sudah diberi notes</option>
+                  <option value="belum">Belum diberi notes</option>
+                </select>
+              </div>
+            )}
 
             {/* Search teks */}
             <div className="sm:col-span-2 lg:col-span-3">
@@ -490,10 +567,11 @@ export default function JadwalOperasiPage() {
                 ? `Total ${pagination.total} jadwal ditemukan`
                 : "Tidak ada jadwal ditemukan"}
             </span>
-            {displayRows.length > 0 && (
+            {summary && pagination.total > 0 && (
               <span className="text-gray-400">
-                {displayRows.filter((r) => !r.Id_Penilaian).length} belum dinilai ·{" "}
-                {displayRows.filter((r) => r.PenilaianStatus === "selesai").length} selesai (halaman ini)
+                {summary.belum_dinilai} belum dinilai · {summary.selesai} selesai
+                {summary.batal > 0 && <> · {summary.batal} batal</>}
+                {canNotes && summary.notes_ada != null && <> · {summary.notes_ada} sudah diberi notes</>}
               </span>
             )}
           </div>
@@ -548,11 +626,10 @@ export default function JadwalOperasiPage() {
                     const dpjp = row.DPJP_Nama
                       ? `${row.DPJP_Nama}${row.DPJP ? ` (${row.DPJP})` : ""}`
                       : row.DPJP || "-";
-                    const hasPenilaian = !!row.Id_Penilaian;
-                    const isSelesai = row.PenilaianStatus === "selesai";
+                    const kind = actionKind(row, isStaffRanap);
 
                     return (
-                      <tr key={row.No_Jadwal} className="hover:bg-emerald-50/30 transition-colors">
+                      <tr key={row.No_Jadwal} className={`transition-colors ${kind === "batal" ? "bg-gray-50/70 opacity-70" : "hover:bg-emerald-50/30"}`}>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="text-xs font-semibold text-gray-800">{row.Tanggal || "-"}</div>
                           <div className="text-xs text-gray-400 mt-0.5">
@@ -594,7 +671,7 @@ export default function JadwalOperasiPage() {
                           </p>
                           {canNotes && (
                             <NotePreview
-                              text={row.Last_Note}
+                              text={row.Last_Note} author={row.Last_Note_User}
                               count={row.Notes_Count}
                               className="mt-1.5 max-w-[240px]"
                               onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -617,21 +694,11 @@ export default function JadwalOperasiPage() {
                           </button>
                           <button
                             onClick={() => handleMulai(row)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                              isSelesai
-                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                                : hasPenilaian
-                                ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                                : "bg-[#2d6a4f] text-white hover:bg-[#1b4332] shadow-sm"
-                            }`}
+                            disabled={kind === "batal" || kind === "locked"}
+                            title={kind === "batal" ? "Jadwal dibatalkan, tidak perlu dinilai" : kind === "locked" ? "Penilaian belum dibuat" : undefined}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${ACTION_STYLE[kind]}`}
                           >
-                            {isSelesai ? (
-                              <><CheckCircle2 className="w-3.5 h-3.5" /> Lihat</>
-                            ) : hasPenilaian ? (
-                              <><Clock className="w-3.5 h-3.5" /> Lanjut</>
-                            ) : (
-                              <><ClipboardPlus className="w-3.5 h-3.5" /> Mulai</>
-                            )}
+                            <ActionLabel kind={kind} />
                           </button>
                         </td>
                       </tr>
@@ -647,11 +714,10 @@ export default function JadwalOperasiPage() {
                 const dpjp = row.DPJP_Nama
                   ? `${row.DPJP_Nama}${row.DPJP ? ` (${row.DPJP})` : ""}`
                   : row.DPJP || "-";
-                const hasPenilaian = !!row.Id_Penilaian;
-                const isSelesai = row.PenilaianStatus === "selesai";
+                const kind = actionKind(row, isStaffRanap);
 
                 return (
-                  <div key={row.No_Jadwal} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <div key={row.No_Jadwal} className={`rounded-2xl border border-gray-100 shadow-sm p-4 ${kind === "batal" ? "bg-gray-50 opacity-75" : "bg-white"}`}>
                     {/* Top row */}
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div>
@@ -694,7 +760,7 @@ export default function JadwalOperasiPage() {
                     {/* Preview notes (role notes) */}
                     {canNotes && (
                       <NotePreview
-                        text={row.Last_Note}
+                        text={row.Last_Note} author={row.Last_Note_User}
                         count={row.Notes_Count}
                         className="mb-3"
                         onClick={() => setNotesModal({ noJadwal: row.No_Jadwal, noReg: row.No_Reg, nama: row.Nama_Pasien })}
@@ -715,21 +781,10 @@ export default function JadwalOperasiPage() {
                     </button>
                     <button
                       onClick={() => handleMulai(row)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition-all ${
-                        isSelesai
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                          : hasPenilaian
-                          ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                          : "bg-[#2d6a4f] text-white hover:bg-[#1b4332] shadow-sm"
-                      }`}
+                      disabled={kind === "batal" || kind === "locked"}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold transition-all ${ACTION_STYLE[kind]}`}
                     >
-                      {isSelesai ? (
-                        <><CheckCircle2 className="w-4 h-4" /> Lihat Penilaian</>
-                      ) : hasPenilaian ? (
-                        <><Clock className="w-4 h-4" /> Lanjut Penilaian</>
-                      ) : (
-                        <><ClipboardPlus className="w-4 h-4" /> Mulai Penilaian</>
-                      )}
+                      <ActionLabel kind={kind} full iconClass="w-4 h-4" />
                     </button>
                     </div>
                   </div>
