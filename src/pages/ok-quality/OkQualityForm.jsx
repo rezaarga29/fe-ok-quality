@@ -2088,7 +2088,7 @@ function OkQualityFormContent() {
                       <div className="border border-gray-100 rounded-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-gray-50">
                         {jadwalRows.map((row) => {
                           // Jadwal Status 'B' (Batal) tidak perlu dinilai
-                          const batal = !row.Id_Penilaian && (Number(row.Is_Batal) === 1 || String(row.JadwalStatus ?? "").trim().toUpperCase() === "B");
+                          const batal = (Number(row.Is_Batal) === 1 || String(row.JadwalStatus ?? "").trim().toUpperCase() === "B");
                           return (
                           <button
                             key={row.No_Jadwal}

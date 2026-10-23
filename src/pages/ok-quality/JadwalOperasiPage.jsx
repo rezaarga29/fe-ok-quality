@@ -43,10 +43,13 @@ function isJadwalBatal(row) {
 }
 
 function stepInfo(row) {
-  if (!row.Id_Penilaian && isJadwalBatal(row)) {
+  // Jadwal batal SELALU tampil "Batal" — termasuk yang sudah terlanjur dinilai
+  if (isJadwalBatal(row)) {
     return {
       text: "Batal",
-      sub: "Jadwal dibatalkan — tidak perlu dinilai",
+      sub: row.Id_Penilaian
+        ? "Jadwal dibatalkan — penilaian tidak dilanjutkan"
+        : "Jadwal dibatalkan — tidak perlu dinilai",
       color: "red",
       icon: Ban,
     };
@@ -101,7 +104,8 @@ const colorMap = {
 //   selesai / lanjut / mulai → alur normal
 function actionKind(row, isStaffRanap) {
   const hasPenilaian = !!row.Id_Penilaian;
-  if (!hasPenilaian && isJadwalBatal(row)) return "batal";
+  // Jadwal batal tidak bisa dinilai lagi (Mulai / Lanjut dikunci)
+  if (isJadwalBatal(row)) return "batal";
   if (isStaffRanap) return hasPenilaian ? "lihat" : "locked";
   if (row.PenilaianStatus === "selesai") return "selesai";
   return hasPenilaian ? "lanjut" : "mulai";
