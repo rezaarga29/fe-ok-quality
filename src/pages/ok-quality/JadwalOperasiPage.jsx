@@ -20,6 +20,8 @@ import {
   StickyNote,
   Ban,
   Eye,
+  HeartCrack,
+  X,
 } from "lucide-react";
 import { getJadwal } from "../../services/ok_quality.service";
 import PerjalananPasienModal from "./PerjalananPasienModal";
@@ -145,6 +147,38 @@ function StepBadge({ row }) {
   );
 }
 
+// ── Stat card (sama seperti di Beranda — klik untuk toggle filter) ────────────
+function StatCard({ label, hint, value, color, icon, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-2xl border p-4 flex items-center gap-3 w-full text-left transition-all
+        ${active ? "ring-2 ring-[#2d6a4f] ring-offset-1" : "hover:shadow-sm"}
+        ${color}`}
+    >
+      <div className="w-9 h-9 shrink-0 rounded-xl bg-white shadow-sm flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <p className="text-2xl font-extrabold text-gray-800 leading-none">{value}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+        {hint && <p className="text-[10px] text-gray-400 leading-tight">{hint}</p>}
+      </div>
+    </button>
+  );
+}
+
+function FilterPill({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#2d6a4f]/10 text-[#2d6a4f]">
+      {label}
+      <button onClick={onRemove} className="hover:text-red-500 transition-colors">
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
 const KAMAR_OPTIONS = Array.from({ length: 10 }, (_, i) => `OK ${i + 1}`);
 
 // Tahun options: 5 tahun ke belakang
@@ -236,8 +270,10 @@ export default function JadwalOperasiPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   // ── Filter state ─────────────────────────────────────────────────────────────
-  const [filterMode, setFilterMode]   = useState("tanggal"); // "tanggal" | "bulan"
+  const [filterMode, setFilterMode]   = useState("tanggal"); // "tanggal" | "bulan" | "rentang"
   const [tanggal,    setTanggal]      = useState(today);
+  const [tanggalDari,   setTanggalDari]   = useState(today);
+  const [tanggalSampai, setTanggalSampai] = useState(today);
   const [bulan,      setBulan]        = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
   const [tahun,      setTahun]        = useState(String(new Date().getFullYear()));
   const [kamar,      setKamar]        = useState("");
@@ -265,6 +301,9 @@ export default function JadwalOperasiPage() {
     const params = { q: q.trim() || undefined, page, limit: LIMIT };
     if (filterMode === "tanggal") {
       params.tanggal = tanggal || undefined;
+    } else if (filterMode === "rentang") {
+      params.tanggal_dari   = tanggalDari   || undefined;
+      params.tanggal_sampai = tanggalSampai || undefined;
     } else {
       params.bulan = bulan || undefined;
       params.tahun = tahun || undefined;
@@ -276,7 +315,7 @@ export default function JadwalOperasiPage() {
     if (kodeKeluar) params.kode_keluar = kodeKeluar;
     if (canNotes && notesFilter) params.notes = notesFilter;
     return params;
-  }, [filterMode, tanggal, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar, notesFilter, canNotes]);
+  }, [filterMode, tanggal, tanggalDari, tanggalSampai, bulan, tahun, kamar, step, q, dpjp, jenisRawat, kodeKeluar, notesFilter, canNotes]);
 
   const fetchPage = useCallback(async (page = 1) => {
     setLoading(true);
@@ -300,7 +339,24 @@ export default function JadwalOperasiPage() {
     }
   }, [buildParams]);
 
-  const handleSearch = useCallback(() => fetchPage(1), [fetchPage]);
+  const handleSearch = useCallback(() => {
+    if (filterMode === "rentang" && tanggalDari && tanggalSampai && tanggalDari > tanggalSampai) {
+      Swal.fire({ icon: "warning", title: "Rentang tanggal tidak valid", text: "Tanggal Dari tidak boleh setelah Tanggal Sampai.", timer: 2500, showConfirmButton: false });
+      return;
+    }
+    fetchPage(1);
+  }, [fetchPage, filterMode, tanggalDari, tanggalSampai]);
+
+  // Klik stat card / hapus pill → cari ulang otomatis setelah state ter-update
+  const [autoSearch, setAutoSearch] = useState(0);
+  useEffect(() => {
+    if (autoSearch > 0) fetchPage(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSearch]);
+  const toggleMeninggal = () => {
+    setKodeKeluar((k) => (k === "MENINGGAL" ? "" : "MENINGGAL"));
+    setAutoSearch((n) => n + 1);
+  };
 
   // Cari otomatis saat mount dengan filter hari ini
   useEffect(() => {
@@ -401,6 +457,16 @@ export default function JadwalOperasiPage() {
               >
                 Per Bulan
               </button>
+              <button
+                onClick={() => setFilterMode("rentang")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filterMode === "rentang"
+                    ? "bg-[#2d6a4f] text-white border-[#2d6a4f]"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-[#2d6a4f]"
+                }`}
+              >
+                Rentang Tanggal
+              </button>
             </div>
 
             {/* Tanggal atau Bulan+Tahun */}
@@ -414,6 +480,29 @@ export default function JadwalOperasiPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] outline-none"
                 />
               </div>
+            ) : filterMode === "rentang" ? (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tanggal Dari</label>
+                  <input
+                    type="date"
+                    value={tanggalDari}
+                    max={tanggalSampai || undefined}
+                    onChange={(e) => setTanggalDari(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tanggal Sampai</label>
+                  <input
+                    type="date"
+                    value={tanggalSampai}
+                    min={tanggalDari || undefined}
+                    onChange={(e) => setTanggalSampai(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] outline-none"
+                  />
+                </div>
+              </>
             ) : (
               <>
                 <div>
@@ -550,8 +639,11 @@ export default function JadwalOperasiPage() {
                   setDpjp(null);
                   setJenisRawat("");
                   setKodeKeluar("");
+                  setNotesFilter("");
                   setFilterMode("tanggal");
                   setTanggal(today);
+                  setTanggalDari(today);
+                  setTanggalSampai(today);
                 }}
                 title="Reset filter"
                 className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors"
@@ -561,6 +653,23 @@ export default function JadwalOperasiPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Stat cards (seperti Beranda — klik Meninggal untuk filter) ── */}
+        {searched && summary && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard label="Total Jadwal"  value={pagination.total}      color="bg-white border-gray-100"         icon={<ClipboardList className="w-4 h-4 text-[#2d6a4f]" />}  active={!kodeKeluar && !step} onClick={() => { setStep(""); setKodeKeluar(""); setAutoSearch((n) => n + 1); }} />
+            <StatCard label="Belum Dinilai" value={summary.belum_dinilai} color="bg-gray-50 border-gray-100"         icon={<CircleDashed className="w-4 h-4 text-gray-400" />}    active={step === "0"} onClick={() => { setStep((v) => v === "0" ? "" : "0"); setAutoSearch((n) => n + 1); }} />
+            <StatCard label="Selesai"       value={summary.selesai}       color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} active={step === "selesai"} onClick={() => { setStep((v) => v === "selesai" ? "" : "selesai"); setAutoSearch((n) => n + 1); }} />
+            <StatCard label="Batal"         value={summary.batal}         color="bg-red-50 border-red-100"         icon={<Ban className="w-4 h-4 text-red-400" />}              active={step === "batal"} onClick={() => { setStep((v) => v === "batal" ? "" : "batal"); setAutoSearch((n) => n + 1); }} />
+            <StatCard label="Meninggal" hint="Surat Ket. Kematian" value={summary.meninggal ?? 0} color="bg-rose-50 border-rose-100" icon={<HeartCrack className="w-4 h-4 text-rose-500" />} active={kodeKeluar === "MENINGGAL"} onClick={toggleMeninggal} />
+          </div>
+        )}
+
+        {kodeKeluar === "MENINGGAL" && (
+          <div className="flex flex-wrap gap-2 px-1">
+            <FilterPill label="Pasien Meninggal" onRemove={toggleMeninggal} />
+          </div>
+        )}
 
         {/* ── Result info ── */}
         {searched && !loading && (
