@@ -47,21 +47,36 @@ export function JenisRawatSelect({ value, onChange, className = "" }) {
 // BE mengirim flag Is_Meninggal (0/1) di setiap baris list / detail / jadwal.
 export const isPasienMeninggal = (flag) => flag === true || Number(flag) === 1;
 
-export function MeninggalBadge({ meninggal }) {
+// tglMeninggal: "YYYY-MM-DD" (tanggal Surat Ket. Kematian), hariPasca: selisih
+// hari dari tanggal penilaian → ditampilkan "3 Nov · H+6" kalau tersedia.
+export function MeninggalBadge({ meninggal, tglMeninggal, hariPasca }) {
   if (!isPasienMeninggal(meninggal)) return null;
+  const tgl = tglMeninggal
+    ? new Date(`${tglMeninggal}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+  const hari = hariPasca != null && hariPasca !== "" && !isNaN(Number(hariPasca)) ? Number(hariPasca) : null;
+  const hariLabel = hari == null ? null : hari >= 0 ? `H+${hari}` : `H${hari}`;
   return (
     <span
       className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
-      title="Pasien meninggal (ada Surat Keterangan Kematian)"
+      title={
+        tgl
+          ? `Pasien meninggal — tgl Surat Ket. Kematian ${tgl}` +
+            (hariLabel ? ` (${hariLabel} dari tanggal penilaian)` : "")
+          : "Pasien meninggal (ada Surat Keterangan Kematian)"
+      }
     >
       <HeartCrack className="w-3 h-3 shrink-0" />
       Meninggal
+      {tgl && <span className="font-normal">· {tgl.replace(/ \d{4}$/, "")}{hariLabel ? ` · ${hariLabel}` : ""}</span>}
     </span>
   );
 }
 
-// value: "" (semua pasien) | "MENINGGAL"
-export function MeninggalSelect({ value, onChange, className = "" }) {
+// value: "" (semua pasien) | "MENINGGAL" | "MENINGGAL_PERIODE"
+// withPeriode: tampilkan opsi "meninggal di periode" (basis tgl surat kematian).
+// Hanya untuk halaman yang endpoint-nya mendukung (beranda & list penilaian).
+export function MeninggalSelect({ value, onChange, className = "", withPeriode = false }) {
   return (
     <select
       value={value}
@@ -69,7 +84,8 @@ export function MeninggalSelect({ value, onChange, className = "" }) {
       className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]/30 focus:border-[#2d6a4f] bg-white ${className}`}
     >
       <option value="">— Semua Pasien —</option>
-      <option value="MENINGGAL">Meninggal</option>
+      <option value="MENINGGAL">{withPeriode ? "Meninggal (penilaian di periode)" : "Meninggal"}</option>
+      {withPeriode && <option value="MENINGGAL_PERIODE">Meninggal di periode (tgl kematian)</option>}
     </select>
   );
 }

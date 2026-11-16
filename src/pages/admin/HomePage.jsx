@@ -234,7 +234,7 @@ function PatientCard({ row, onView, onEdit, onKesimpulan, onPerjalanan, onSuratK
         <div className="flex flex-col items-end gap-1 shrink-0">
           <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
           <JenisRawatBadge jenis={row.Jenis_Rawat} />
-          <MeninggalBadge meninggal={row.Is_Meninggal} />
+          <MeninggalBadge meninggal={row.Is_Meninggal} tglMeninggal={row.Tgl_Meninggal} hariPasca={row.Hari_Pasca} />
         </div>
       </div>
 
@@ -398,7 +398,7 @@ export default function HomePage() {
   const greeting = getGreeting();
 
   const [data,            setData]            = useState([]);
-  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanDubia: 0, kesimpulanBonamSanam: 0, kesimpulanMalam: 0, meninggal: 0 });
+  const [stats,           setStats]           = useState({ total: 0, selesai: 0, inProgress: 0, kesimpulanDubia: 0, kesimpulanBonamSanam: 0, kesimpulanMalam: 0, meninggal: 0, meninggalPeriode: 0 });
   const [loading,         setLoading]         = useState(true);
   const [refreshing,      setRefreshing]      = useState(false);
   const [showFilters,     setShowFilters]     = useState(false);
@@ -434,7 +434,7 @@ export default function HomePage() {
   // tetap tampil di pill walau list dokter belum selesai dimuat
   const [dpjpFilter,      setDpjpFilter]       = useState(savedFilters.dpjpFilter      ?? null);
   const [jenisRawatFilter, setJenisRawatFilter] = useState(savedFilters.jenisRawatFilter ?? "");
-  const [kodeKeluarFilter, setKodeKeluarFilter] = useState(savedFilters.kodeKeluarFilter === "MENINGGAL" ? "MENINGGAL" : ""); // "" | "MENINGGAL"
+  const [kodeKeluarFilter, setKodeKeluarFilter] = useState(["MENINGGAL", "MENINGGAL_PERIODE"].includes(savedFilters.kodeKeluarFilter) ? savedFilters.kodeKeluarFilter : ""); // "" | "MENINGGAL" | "MENINGGAL_PERIODE"
   const [notesFilter,     setNotesFilter]      = useState(["ada", "belum"].includes(savedFilters.notesFilter) ? savedFilters.notesFilter : ""); // "" | "ada" | "belum"
   const [lukaRanapFilter, setLukaRanapFilter]  = useState(["belum", "sudah"].includes(savedFilters.lukaRanapFilter) ? savedFilters.lukaRanapFilter : ""); // "" | "belum" | "sudah"
 
@@ -491,6 +491,7 @@ export default function HomePage() {
         kesimpulanBonamSanam: d.kesimpulan_bonam_sanam   || 0,
         kesimpulanMalam:      d.kesimpulan_malam         || 0,
         meninggal:            d.meninggal                || 0,
+        meninggalPeriode:     d.meninggal_periode        || 0,
         notesAda:             d.notes_ada ?? null,       // hanya untuk role notes (server-side)
       });
     } catch {
@@ -582,7 +583,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Stat cards (klikable jadi filter, mengikuti filter aktif) ──────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         <StatCard label="Total Penilaian"  value={stats.total}                color="bg-white border-gray-100"         icon={<ClipboardList  className="w-4 h-4 text-[#2d6a4f]"   />} active={!statusFilter && !penilaianFilter && !kodeKeluarFilter}              onClick={resetFilters} />
         <StatCard label="Selesai"          value={stats.selesai}              color="bg-emerald-50 border-emerald-100" icon={<CheckCircle2   className="w-4 h-4 text-emerald-500" />} active={statusFilter === "selesai"}                    onClick={() => handleStatClick("selesai")} />
         <StatCard label="Sedang Berjalan"  value={stats.inProgress}           color="bg-amber-50 border-amber-100"     icon={<Clock          className="w-4 h-4 text-amber-500"   />} active={statusFilter === "draft"}                      onClick={() => { setStatusFilter("draft"); setTahapFilter(""); setPenilaianFilter(""); setActiveSearch(""); setSearchInput(""); }} />
@@ -590,7 +591,11 @@ export default function HomePage() {
         <StatCard label="Bonam / Sanam"    hint="Prognosis baik"       value={stats.kesimpulanBonamSanam} color="bg-teal-50 border-teal-100"       icon={<ThumbsUp       className="w-4 h-4 text-teal-500"    />} active={penilaianFilter === "Bonam / Sanam"}           onClick={() => { setPenilaianFilter((p) => p === "Bonam / Sanam" ? "" : "Bonam / Sanam"); setStatusFilter(""); }} />
         <StatCard label="Dubia"            hint="Prognosis meragukan"  value={stats.kesimpulanDubia}      color="bg-amber-50 border-amber-100"     icon={<CircleHelp     className="w-4 h-4 text-amber-500"   />} active={penilaianFilter === "Dubia"}                   onClick={() => { setPenilaianFilter((p) => p === "Dubia" ? "" : "Dubia"); setStatusFilter(""); }} />
         <StatCard label="Malam"            hint="Prognosis buruk"      value={stats.kesimpulanMalam}      color="bg-red-50 border-red-100"         icon={<ThumbsDown     className="w-4 h-4 text-red-400"     />} active={penilaianFilter === "Malam"}                   onClick={() => { setPenilaianFilter((p) => p === "Malam" ? "" : "Malam"); setStatusFilter(""); }} />
-        <StatCard label="Meninggal"        hint="Surat Ket. Kematian" value={stats.meninggal}            color="bg-rose-50 border-rose-100"       icon={<HeartCrack     className="w-4 h-4 text-rose-500"    />} active={kodeKeluarFilter === "MENINGGAL"}              onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL" ? "" : "MENINGGAL")} />
+        {/* Meninggal — 2 basis tanggal:
+            1) kohort: pasien yang PENILAIAN-nya di rentang tanggal, lalu meninggal (kapan pun)
+            2) periode: pasien yang TANGGAL SURAT KEMATIAN-nya di rentang tanggal */}
+        <StatCard label="Meninggal"        hint="Dari pasien yg dinilai"  value={stats.meninggal}        color="bg-rose-50 border-rose-100"       icon={<HeartCrack     className="w-4 h-4 text-rose-500"    />} active={kodeKeluarFilter === "MENINGGAL"}              onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL" ? "" : "MENINGGAL")} />
+        <StatCard label="Meninggal di Periode" hint="Tgl Surat Ket. Kematian" value={stats.meninggalPeriode} color="bg-rose-50 border-rose-100"   icon={<HeartCrack     className="w-4 h-4 text-rose-700"    />} active={kodeKeluarFilter === "MENINGGAL_PERIODE"}      onClick={() => setKodeKeluarFilter((k) => k === "MENINGGAL_PERIODE" ? "" : "MENINGGAL_PERIODE")} />
       </div>
 
       {/* ── Cards section ────────────────────────────────────────────────── */}
@@ -711,7 +716,7 @@ export default function HomePage() {
             {/* Status Pasien (meninggal) */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status Pasien</label>
-              <MeninggalSelect value={kodeKeluarFilter} onChange={setKodeKeluarFilter} />
+              <MeninggalSelect value={kodeKeluarFilter} onChange={setKodeKeluarFilter} withPeriode />
             </div>
 
             {/* Jenis Rawat */}
@@ -836,7 +841,7 @@ export default function HomePage() {
             {penilaianFilter    && <FilterPill label={`Penilaian: ${penilaianFilter}`}                         onRemove={() => setPenilaianFilter("")} />}
             {dpjpFilter         && <FilterPill label={`DPJP: ${dpjpFilter.label}`}                             onRemove={() => setDpjpFilter(null)} />}
             {jenisRawatFilter   && <FilterPill label={`Jenis Rawat: ${jenisRawatFilter}`}                      onRemove={() => setJenisRawatFilter("")} />}
-            {kodeKeluarFilter   && <FilterPill label="Pasien Meninggal" onRemove={() => setKodeKeluarFilter("")} />}
+            {kodeKeluarFilter   && <FilterPill label={kodeKeluarFilter === "MENINGGAL_PERIODE" ? "Meninggal di periode (tanggal = tgl surat kematian)" : "Pasien Meninggal"} onRemove={() => setKodeKeluarFilter("")} />}
             {lukaRanapFilter    && <FilterPill label={lukaRanapFilter === "belum" ? "Luka Ranap belum diisi" : "Luka Ranap sudah diisi"} onRemove={() => setLukaRanapFilter("")} />}
             {canNotes && notesFilter && <FilterPill label={notesFilter === "ada" ? "Sudah diberi notes" : "Belum diberi notes"} onRemove={() => setNotesFilter("")} />}
             {tanggalDari        && <FilterPill label={`Dari: ${tanggalDari}`}                                  onRemove={() => setTanggalDari("")} />}
