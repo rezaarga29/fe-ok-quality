@@ -260,6 +260,7 @@ export default function OkQualityList() {
             value={kodeKeluarFilter}
             onChange={setKodeKeluarFilter}
             className="py-2.5"
+            withPeriode
           />
         </div>
 
@@ -357,7 +358,7 @@ export default function OkQualityList() {
                         <div className="flex flex-col items-start gap-1">
                           <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
                           <JenisRawatBadge jenis={row.Jenis_Rawat} />
-                          <MeninggalBadge meninggal={row.Is_Meninggal} />
+                          <MeninggalBadge meninggal={row.Is_Meninggal} tglMeninggal={row.Tgl_Meninggal} hariPasca={row.Hari_Pasca} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -446,7 +447,7 @@ export default function OkQualityList() {
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge tahap={row.Tahap_Selesai} status={row.Status} />
                       <JenisRawatBadge jenis={row.Jenis_Rawat} />
-                      <MeninggalBadge meninggal={row.Is_Meninggal} />
+                      <MeninggalBadge meninggal={row.Is_Meninggal} tglMeninggal={row.Tgl_Meninggal} hariPasca={row.Hari_Pasca} />
                     </div>
                   </div>
                   <ProgressBar tahap={row.Tahap_Selesai} />
